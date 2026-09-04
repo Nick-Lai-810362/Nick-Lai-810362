@@ -121,22 +121,23 @@ function stdTable(s, rows, opts) {
   });
 }
 
-/* ============ SLIDE 1: TITLE ============ */
+/* ============ SLIDE 1: TITLE (white background) ============ */
 {
-  const s = newSlide(NAVY);
-  s.addShape("ellipse", { x: 10.2, y: -1.8, w: 5, h: 5, fill: { color: "1E293B" }, line: { type: "none" } });
-  s.addShape("ellipse", { x: -1.6, y: 5.2, w: 4, h: 4, fill: { color: "1E293B" }, line: { type: "none" } });
+  const s = newSlide(WHITE);
+  // subtle decorative circles, light tint only — no dark fill
+  s.addShape("ellipse", { x: 10.4, y: -2.0, w: 5, h: 5, fill: { color: LIGHT_TINT }, line: { type: "none" } });
+  s.addShape("ellipse", { x: -1.8, y: 5.4, w: 4, h: 4, fill: { color: LIGHT_TINT2 }, line: { color: BORDER, width: 0.75 } });
 
   s.addText("TSGEX 資產管理部", {
-    x: 0.9, y: 1.6, w: 11.5, h: 0.5, fontFace: FONT, fontSize: 16, color: "93C5FD",
+    x: 0.9, y: 1.6, w: 11.5, h: 0.5, fontFace: FONT, fontSize: 16, color: ACCENT,
     bold: true, align: "left", isTextBox: true, margin: 0, charSpacing: 2,
   });
   s.addText("自有流動資金收益優化可行性評估報告", {
-    x: 0.9, y: 2.15, w: 11.5, h: 1.1, fontFace: FONT, fontSize: 40, color: WHITE,
+    x: 0.9, y: 2.15, w: 11.5, h: 1.1, fontFace: FONT, fontSize: 40, color: NAVY,
     bold: true, align: "left", isTextBox: true, margin: 0,
   });
   s.addText("五大主流工具數據穿透、風險剖析與財務部資產配置決策矩陣", {
-    x: 0.9, y: 3.15, w: 11.5, h: 0.6, fontFace: FONT, fontSize: 18, color: "CBD5E1",
+    x: 0.9, y: 3.15, w: 11.5, h: 0.6, fontFace: FONT, fontSize: 18, color: SLATE,
     align: "left", isTextBox: true, margin: 0,
   });
 
@@ -146,16 +147,16 @@ function stdTable(s, rows, opts) {
   let cx = 0.9;
   chips.forEach((c) => {
     const w = 0.18 + c.length * 0.115;
-    s.addShape("roundRect", { x: cx, y: 4.35, w, h: 0.42, rectRadius: 0.21, fill: { color: "1E293B" }, line: { color: "334155", width: 0.75 } });
-    s.addText(c, { x: cx, y: 4.35, w, h: 0.42, fontFace: FONT, fontSize: 10.5, color: "93C5FD", align: "center", valign: "middle", isTextBox: true, margin: 0 });
+    s.addShape("roundRect", { x: cx, y: 4.35, w, h: 0.42, rectRadius: 0.21, fill: { color: LIGHT_TINT }, line: { color: BORDER, width: 0.75 } });
+    s.addText(c, { x: cx, y: 4.35, w, h: 0.42, fontFace: FONT, fontSize: 10.5, color: ACCENT, align: "center", valign: "middle", isTextBox: true, margin: 0 });
     cx += w + 0.18;
   });
 
   s.addText("提案呈送：財務部（Treasury & Finance）｜風險管理委員會｜投資委員會（IC）", {
-    x: 0.9, y: 6.35, w: 8, h: 0.35, fontFace: FONT, fontSize: 12, color: "94A3B8", isTextBox: true, margin: 0,
+    x: 0.9, y: 6.35, w: 8, h: 0.35, fontFace: FONT, fontSize: 12, color: SLATE, isTextBox: true, margin: 0,
   });
   s.addText("內部機密（Internal Confidential）｜2026年9月｜文件編號 TSGEX-AM-2026-0904-R2", {
-    x: 0.9, y: 6.7, w: 10, h: 0.35, fontFace: FONT, fontSize: 11, color: "64748B", isTextBox: true, margin: 0,
+    x: 0.9, y: 6.7, w: 10, h: 0.35, fontFace: FONT, fontSize: 11, color: MUTED, isTextBox: true, margin: 0,
   });
 }
 
@@ -482,11 +483,11 @@ function stdTable(s, rows, opts) {
   footer(s, "13 / 14");
 }
 
-/* ============ SLIDE 14: GOVERNANCE + ROADMAP + CLOSE ============ */
+/* ============ SLIDE 14: GOVERNANCE + ROADMAP + CLOSE (white background) ============ */
 {
-  const s = newSlide(NAVY);
+  const s = newSlide(WHITE);
   s.addText("內控架構與推進時程", {
-    x: 0.6, y: 0.5, w: PW - 1.2, h: 0.6, fontFace: FONT, bold: true, fontSize: 28, color: WHITE, isTextBox: true, margin: 0,
+    x: 0.6, y: 0.5, w: PW - 1.2, h: 0.6, fontFace: FONT, bold: true, fontSize: 28, color: NAVY, isTextBox: true, margin: 0,
   });
 
   const guard = [
@@ -497,9 +498,9 @@ function stdTable(s, rows, opts) {
   ];
   let gy = 1.5;
   guard.forEach((g) => {
-    s.addShape("roundRect", { x: 0.6, y: gy, w: 0.14, h: 0.6, fill: { color: ACCENT }, line: { type: "none" }, rectRadius: 0.04 });
-    s.addText(g[0], { x: 0.95, y: gy - 0.02, w: 2.3, h: 0.62, fontFace: FONT, bold: true, fontSize: 12.5, color: "93C5FD", isTextBox: true, margin: 0, valign: "middle" });
-    s.addText(g[1], { x: 3.3, y: gy - 0.02, w: 3.4, h: 0.62, fontFace: FONT, fontSize: 10, color: "CBD5E1", isTextBox: true, margin: 0, valign: "middle", lineSpacingMultiple: 1.1 });
+    circleLabel(s, 0.6, gy, 0.45, "•", { fill: LIGHT_TINT, color: ACCENT, fontSize: 18 });
+    s.addText(g[0], { x: 1.2, y: gy - 0.02, w: 2.05, h: 0.5, fontFace: FONT, bold: true, fontSize: 12.5, color: NAVY, isTextBox: true, margin: 0, valign: "middle" });
+    s.addText(g[1], { x: 3.3, y: gy - 0.02, w: 3.4, h: 0.5, fontFace: FONT, fontSize: 10, color: SLATE, isTextBox: true, margin: 0, valign: "middle", lineSpacingMultiple: 1.1 });
     gy += 0.75;
   });
 
@@ -512,25 +513,25 @@ function stdTable(s, rows, opts) {
   const phaseW = 1.55, phaseGap = 0.28;
   phases.forEach((p, i) => {
     const w = phaseW;
-    s.addShape("roundRect", { x: px, y: 1.5, w, h: 3.0, rectRadius: 0.08, fill: { color: "1E293B" }, line: { color: "334155", width: 0.75 } });
+    s.addShape("roundRect", { x: px, y: 1.5, w, h: 3.0, rectRadius: 0.08, fill: { color: LIGHT_TINT2 }, line: { color: BORDER, width: 0.75 } });
     s.addText(p[0], { x: px + 0.13, y: 1.65, w: w - 0.26, h: 0.35, fontFace: FONT, bold: true, fontSize: 12.5, color: ACCENT, isTextBox: true, margin: 0 });
-    s.addText(p[1], { x: px + 0.13, y: 2.05, w: w - 0.26, h: 1.5, fontFace: FONT, fontSize: 9.5, color: WHITE, isTextBox: true, margin: 0, lineSpacingMultiple: 1.2 });
-    s.addText(p[2], { x: px + 0.13, y: 3.9, w: w - 0.26, h: 0.5, fontFace: FONT, fontSize: 8.5, color: "94A3B8", isTextBox: true, margin: 0 });
+    s.addText(p[1], { x: px + 0.13, y: 2.05, w: w - 0.26, h: 1.5, fontFace: FONT, fontSize: 9.5, color: NAVY, isTextBox: true, margin: 0, lineSpacingMultiple: 1.2 });
+    s.addText(p[2], { x: px + 0.13, y: 3.9, w: w - 0.26, h: 0.5, fontFace: FONT, fontSize: 8.5, color: MUTED, isTextBox: true, margin: 0 });
     if (i < phases.length - 1) {
-      s.addText("→", { x: px + w, y: 2.7, w: phaseGap, h: 0.6, fontFace: FONT, fontSize: 16, color: "64748B", align: "center", isTextBox: true, margin: 0 });
+      s.addText("→", { x: px + w, y: 2.7, w: phaseGap, h: 0.6, fontFace: FONT, fontSize: 16, color: MUTED, align: "center", isTextBox: true, margin: 0 });
     }
     px += w + phaseGap;
   });
 
-  s.addShape("line", { x: 0.6, y: 4.85, w: PW - 1.2, h: 0, line: { color: "334155", width: 0.75 } });
+  s.addShape("line", { x: 0.6, y: 4.85, w: PW - 1.2, h: 0, line: { color: BORDER, width: 0.75 } });
 
-  s.addText("下一步", { x: 0.6, y: 5.05, w: 4, h: 0.4, fontFace: FONT, bold: true, fontSize: 16, color: WHITE, isTextBox: true, margin: 0 });
+  s.addText("下一步", { x: 0.6, y: 5.05, w: 4, h: 0.4, fontFace: FONT, bold: true, fontSize: 16, color: NAVY, isTextBox: true, margin: 0 });
   s.addText(
     "請財務部、風控委員會與法遵室完成本報告會簽，核定 Phase 1 啟動時程與各平台曝險上限、雙幣理財 OTM 緩衝門檻，以及模型 A／B／C 或客製化配置權重。",
-    { x: 0.6, y: 5.5, w: PW - 1.2, h: 0.8, fontFace: FONT, fontSize: 13, color: "CBD5E1", isTextBox: true, margin: 0, lineSpacingMultiple: 1.25 }
+    { x: 0.6, y: 5.5, w: PW - 1.2, h: 0.8, fontFace: FONT, fontSize: 13, color: SLATE, isTextBox: true, margin: 0, lineSpacingMultiple: 1.25 }
   );
 
-  footer(s, "14 / 14", true);
+  footer(s, "14 / 14");
 }
 
 pres.writeFile({ fileName: process.argv[2] || "output.pptx" }).then((fileName) => {

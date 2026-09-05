@@ -197,7 +197,7 @@ function stdTable(s, rows, opts) {
   card(s, 0.6, 5.9, PW - 1.2, 1.0, "本報告定位",
     "五項工具視為功能各異之「資產配置積木」，涵蓋純固定收益、資金池活期收益、賣方結構型衍生品三種收益本質；報告以呈現真實金融工程機制、數據試算與風險因子為唯一目的，最終配置決策保留予財務部與投資委員會依風險偏好判斷。",
     { fill: LIGHT_TINT2, bodySize: 11.5 });
-  footer(s, "2 / 14");
+  footer(s, "2 / 15");
 }
 
 /* ============ SLIDE 3: BENCHMARK ============ */
@@ -215,7 +215,7 @@ function stdTable(s, rows, opts) {
   card(s, 6.75, 4.1, 5.98, 2.5, "客觀中立原則",
     "全篇報告聚焦「100% 公開、透明、真實」之底層邏輯、真實收益率計算與具體風險因子，不對任一標的下達主觀否定性結論；五項工具均視為可依風險偏好調整權重之配置積木。",
     { fill: LIGHT_TINT2, bodySize: 12 });
-  footer(s, "3 / 14");
+  footer(s, "3 / 15");
 }
 
 /* ============ SLIDE 4: BITFINEX MECHANISM ============ */
@@ -243,7 +243,7 @@ function stdTable(s, rows, opts) {
   card(s, 6.75, y + 0.15, 5.98, 1.65, "利差階梯掛單授權",
     "常態（APR<15%）：2–7 天短天期滾存｜高息溢價期（APR≥15%）：開放至 15–30 天鎖定超額利潤｜極端波動期（APR≥30%+）：專案彈性授權至 60–120 天",
     { fill: LIGHT_TINT2, bodySize: 11.5 });
-  footer(s, "4 / 14");
+  footer(s, "4 / 15");
 }
 
 /* ============ SLIDE 5: BITFINEX DATA & SCENARIOS ============ */
@@ -283,7 +283,7 @@ function stdTable(s, rows, opts) {
   s.addText("本金 $1,000,000｜相較即時 SOFR（3.66%）：保守 +59bps／基準 +663bps／樂觀 +1,334bps+", {
     x: 7.5, y: 5.85, w: 5.23, h: 0.8, fontFace: FONT, fontSize: 10, color: MUTED, isTextBox: true, margin: 0, lineSpacingMultiple: 1.2,
   });
-  footer(s, "5 / 14");
+  footer(s, "5 / 15");
 }
 
 /* ============ SLIDE 6: OKX FLEXIBLE ============ */
@@ -308,7 +308,7 @@ function stdTable(s, rows, opts) {
 
   statCallout(s, 8.95, 3.9, 3.78, 1.5, "2.98%", "加權平均 Effective APY（中位情境）", { valueSize: 30 });
   statCallout(s, 8.95, 5.55, 3.78, 1.15, "1.70%–4.25%", "浮動區間（市場APR 2%–5%）", { valueSize: 20, valueColor: NAVY, fill: LIGHT_TINT2 });
-  footer(s, "6 / 14");
+  footer(s, "6 / 15");
 }
 
 /* ============ SLIDE 7: BINANCE FLEXIBLE ============ */
@@ -335,7 +335,7 @@ function stdTable(s, rows, opts) {
   card(s, 8.95, 5.55, 3.78, 1.15, null,
     "Bonus 級距僅佔百萬資金之 0.02%，機構規模有效年化幾乎完全收斂至 Real-Time APR 基礎利率。",
     { fill: LIGHT_TINT2, bodySize: 10.5 });
-  footer(s, "7 / 14");
+  footer(s, "7 / 15");
 }
 
 /* ============ SLIDE 8: CAPITAL DRAG CHART ============ */
@@ -362,7 +362,7 @@ function stdTable(s, rows, opts) {
   card(s, 8.1, 3.35, 4.63, 2.6, "財務部審查重點",
     "行銷頁面高年化僅具「獲客展示」意義，對百萬美元等級機構資金不具實質參考價值。若整筆 $1,000,000 均比照行銷頭牌利率估算，OKX 與 Binance 之實際年度利息分別短少約 $84,878 與 $44,994——此為配置活期理財時應納入之機會成本。",
     { fill: LIGHT_TINT2, bodySize: 11.5 });
-  footer(s, "8 / 14");
+  footer(s, "8 / 15");
 }
 
 /* ============ SLIDE 9: OKX DUAL INVESTMENT ============ */
@@ -388,7 +388,35 @@ function stdTable(s, rows, opts) {
   card(s, 0.6, 5.75, PW - 1.2, 1.15, "財務運用場景",
     "① 設定目標價逢低分批建倉：於等待建倉價位期間同時賺取權利金｜② 震盪市掛深度價外（OTM 10%+）收益增強：降低轉換機率，以較低年化換取較高本金安全邊際",
     { fill: LIGHT_TINT2, bodySize: 11 });
-  footer(s, "9 / 14");
+  footer(s, "9 / 15");
+}
+
+/* ============ SLIDE 9B: WHEEL STRATEGY (rolling re-sell at same strike) ============ */
+{
+  const s = newSlide();
+  sectionTitle(s, "④ 進階策略：轉換後之滾動掛單（\"Wheel\" 策略）", "本金轉為 BTC 後不認賠平倉，改以同一行使價反向掛「高賣」等待價格回升");
+
+  card(s, 0.6, 1.6, 5.95, 2.1, "怎麼做？（Covered-Call Wheel 概念）",
+    "① 低買轉換為 BTC 後，② 立即以持有之 BTC、相同行使價（$55,900）掛出「高賣」收取權利金；③ 若到期未漲破，繼續持有 BTC 並重複掛單；④ 一旦漲破，BTC 依原行使價換回 USDT，本金名目值完整取回，且期間累積之權利金全數保留。",
+    { fill: LIGHT_TINT, bodySize: 11 });
+
+  stdTable(s, [
+    ["週期", "操作", "示意年化", "本期權利金", "結算結果"],
+    ["第1週 低買", "$1,000,000→轉換為17.8891 BTC", "40%", "$7,671", "跌破，轉換為BTC"],
+    ["第2週 高賣", "同一行使價 $55,900 滾動掛單", "32%", "$5,823", "未漲破，續留BTC"],
+    ["第3週 高賣", "同一行使價 $55,900 滾動掛單", "38%", "$7,042", "漲破，換回USDT"],
+  ], { x: 6.75, y: 1.6, w: 5.98, colW: [1.15, 2.13, 1.0, 1.1, 1.6], fontSize: 9, rowH: 0.5 });
+
+  statCallout(s, 0.6, 3.95, 3.9, 1.55, "+2.05%（3週）", "順利路徑：本金全數取回＋累積權利金 $20,535", { valueSize: 22, valueColor: GOOD });
+  statCallout(s, 4.7, 3.95, 3.9, 1.55, "-28.4%（未實現）", "對照情境：10週價格未回升，帳面浮虧 $284,436", { valueSize: 22, valueColor: WARN, fill: LIGHT_TINT2 });
+  card(s, 8.75, 3.95, 3.98, 1.55, "關鍵前提",
+    "「不會虧錢」僅在最終價格確實回升至原行使價、且過程中未改用更低行使價時成立。",
+    { fill: LIGHT_TINT2, bodySize: 10.5 });
+
+  card(s, 0.6, 5.7, PW - 1.2, 1.2, "財務部應理解之三項限制",
+    "① 權利金隨套牢加深而遞減（越價外，權利金越低，非維持初始水準）｜② 價格回升時間無保證，資金於等待期間無法投入其他生息工具（機會成本）｜③ FVTPL會計原則下，未回升期間之BTC部位仍須逐期認列未實現跌價損失，非「零風險」",
+    { fill: LIGHT_TINT, bodySize: 10.5 });
+  footer(s, "10 / 15");
 }
 
 /* ============ SLIDE 10: BINANCE DUAL INVESTMENT ============ */
@@ -411,7 +439,7 @@ function stdTable(s, rows, opts) {
   card(s, 8.9, 4.85, 3.83, 1.85, "財務運用場景",
     "高賣獲利了結：對已持有 BTC/ETH 部位設定目標賣出價｜低買策略性積累：搭配 Auto-Compound 系統化執行，惟須留意連續期間累積曝險",
     { fill: LIGHT_TINT, bodySize: 10.5 });
-  footer(s, "10 / 14");
+  footer(s, "11 / 15");
 }
 
 /* ============ SLIDE 11: ACCOUNTING MATRIX ============ */
@@ -428,7 +456,7 @@ function stdTable(s, rows, opts) {
     ["外部審計函證難度", "中等", "中等偏難", "高難度"],
     ["合規成本（相對排序）", "低", "中", "高"],
   ], { x: 0.6, y: 1.65, w: PW - 1.2, colW: [2.6, 3.2, 3.7, 2.83], fontSize: 10.5, centerCols: [], rowH: 0.62 });
-  footer(s, "11 / 14");
+  footer(s, "12 / 15");
 }
 
 /* ============ SLIDE 12: COMPREHENSIVE MATRIX ============ */
@@ -445,7 +473,7 @@ function stdTable(s, rows, opts) {
     ["流動性召回", "天期鎖定(2–120天)", "即時", "即時", "鎖定至結算日", "鎖定至結算日"],
     ["會計複雜度", "低", "中", "中", "高", "高"],
   ], { x: 0.6, y: 1.65, w: PW - 1.2, colW: [2.13, 2.24, 2.24, 2.24, 2.24, 2.24], fontSize: 9.5, centerCols: [1, 2, 3, 4, 5], rowH: 0.62 });
-  footer(s, "12 / 14");
+  footer(s, "13 / 15");
 }
 
 /* ============ SLIDE 13: ALLOCATION MODELS ============ */
@@ -480,7 +508,7 @@ function stdTable(s, rows, opts) {
   card(s, 0.6, 5.1, PW - 1.2, 1.6, "方法論揭露（重要）",
     "雙幣理財之 45% 年化係採「未觸及行使價（價外到期）」情境計算，未反映觸價本金轉換損失。若納入機率加權情境分析，實際綜合年化將視市場波動與觸價機率顯著偏離本表數字，甚至於單一結算週期內轉為負值，詳見報告第 6、7 章情境試算。",
     { fill: LIGHT_TINT, bodySize: 11 });
-  footer(s, "13 / 14");
+  footer(s, "14 / 15");
 }
 
 /* ============ SLIDE 14: GOVERNANCE + ROADMAP + CLOSE (white background) ============ */
@@ -531,7 +559,7 @@ function stdTable(s, rows, opts) {
     { x: 0.6, y: 5.5, w: PW - 1.2, h: 0.8, fontFace: FONT, fontSize: 13, color: SLATE, isTextBox: true, margin: 0, lineSpacingMultiple: 1.25 }
   );
 
-  footer(s, "14 / 14");
+  footer(s, "15 / 15");
 }
 
 pres.writeFile({ fileName: process.argv[2] || "output.pptx" }).then((fileName) => {

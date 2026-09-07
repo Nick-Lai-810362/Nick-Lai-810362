@@ -154,7 +154,7 @@ def fetch_funding_trades(symbol: str, start_dt: datetime, end_dt: datetime, out_
         if not batch:
             break
         rows.extend(batch)
-        oldest_mts = batch[-1][0]
+        oldest_mts = batch[-1][1]  # [ID, MTS, AMOUNT, RATE, PERIOD] -- MTS is index 1, not 0
         print(f"  got {len(batch)} rows, oldest so far: {datetime.fromtimestamp(oldest_mts/1000, tz=timezone.utc).date()}")
         if oldest_mts >= cursor:
             break  # no progress, avoid infinite loop
@@ -163,11 +163,11 @@ def fetch_funding_trades(symbol: str, start_dt: datetime, end_dt: datetime, out_
 
     with open(out_path, "w", newline="") as f:
         w = csv.writer(f)
-        w.writerow(["timestamp_utc", "mts", "offer_id", "amount", "daily_rate", "apr", "period_days"])
+        w.writerow(["timestamp_utc", "mts", "trade_id", "amount", "daily_rate", "apr", "period_days"])
         for r in rows:
-            mts, offer_id, amount, rate, period = r[0], r[1], r[2], r[3], r[4]
+            trade_id, mts, amount, rate, period = r[0], r[1], r[2], r[3], r[4]
             ts = datetime.fromtimestamp(mts / 1000, tz=timezone.utc).isoformat()
-            w.writerow([ts, mts, offer_id, amount, rate, rate * 365, period])
+            w.writerow([ts, mts, trade_id, amount, rate, rate * 365, period])
     print(f"  wrote {len(rows)} rows -> {out_path}")
 
 
@@ -226,15 +226,16 @@ def fetch_stats(key_expr: str, start_dt: datetime, end_dt: datetime, out_path: s
 
 
 def fetch_own_funding_trades(symbol: str, api_key: str, api_secret: str, out_path: str):
+    """Schema: [ID, SYMBOL, MTS_CREATE, OFFER_ID, AMOUNT, RATE, PERIOD, MAKER]"""
     print("Fetching YOUR OWN historical funding trades (requires funding-read API key)...")
     rows = _signed_post(f"auth/r/funding/trades/{symbol}/hist", api_key, api_secret, {"limit": 2500})
     with open(out_path, "w", newline="") as f:
         w = csv.writer(f)
-        w.writerow(["timestamp_utc", "mts", "offer_id", "amount", "daily_rate", "apr", "period_days"])
+        w.writerow(["timestamp_utc", "mts", "trade_id", "offer_id", "amount", "daily_rate", "apr", "period_days"])
         for r in rows:
-            mts = r[1]
+            trade_id, symbol_, mts, offer_id, amount, rate, period = r[0], r[1], r[2], r[3], r[4], r[5], r[6]
             ts = datetime.fromtimestamp(mts / 1000, tz=timezone.utc).isoformat()
-            w.writerow([ts, mts, r[0], r[4], r[5], r[5] * 365, r[6]])
+            w.writerow([ts, mts, trade_id, offer_id, amount, rate, rate * 365, period])
     print(f"  wrote {len(rows)} rows -> {out_path}")
 
 
@@ -242,25 +243,44 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--years", type=float, default=5, help="How many years of history to pull (default 5)")
     ap.add_argument("--symbol", default="fUSD")
+    ap.add_argument("--trade-days", type=float, default=180,
+                     help="Raw tick-level funding trades are extremely high-volume "
+                          "(~1 trade every ~1.5s on fUSD) -- 5 years of full history would be "
+                          "100M+ rows and take hours. Default pulls only the most recent 180 "
+                          "days of raw trades; the hourly candles (--years) already cover the "
+                          "full period and are the primary time series for modeling.")
     ap.add_argument("--api-key", default=os.environ.get("BFX_API_KEY"))
     ap.add_argument("--api-secret", default=os.environ.get("BFX_API_SECRET"))
+    ap.add_argument("--skip-candles", action="store_true", help="Skip the 3 funding-rate candle files (already pulled successfully last run)")
+    ap.add_argument("--skip-btc", action="store_true", help="Skip the BTC daily price file (already pulled successfully last run)")
+    ap.add_argument("--skip-stats", action="store_true", help="Skip the funding-size-outstanding file")
     args = ap.parse_args()
 
     os.makedirs(OUT_DIR, exist_ok=True)
     end_dt = datetime.now(timezone.utc)
     start_dt = end_dt - timedelta(days=args.years * 365)
+    trades_start_dt = end_dt - timedelta(days=args.trade_days)
 
-    fetch_funding_trades(args.symbol, start_dt, end_dt, os.path.join(OUT_DIR, f"funding_trades_{args.symbol}.csv"))
+    fetch_funding_trades(args.symbol, trades_start_dt, end_dt, os.path.join(OUT_DIR, f"funding_trades_{args.symbol}.csv"))
 
-    for period_code in ["p2", "p30", "p120"]:
-        fetch_candles(f"{args.symbol}:{period_code}", start_dt, end_dt,
-                      os.path.join(OUT_DIR, f"funding_candles_{args.symbol}_{period_code}.csv"))
+    if not args.skip_candles:
+        for period_code in ["p2", "p30", "p120"]:
+            fetch_candles(f"{args.symbol}:{period_code}", start_dt, end_dt,
+                          os.path.join(OUT_DIR, f"funding_candles_{args.symbol}_{period_code}.csv"))
 
-    fetch_stats(f"funding.size:1m:{args.symbol}:long", start_dt, end_dt,
-                os.path.join(OUT_DIR, "funding_size_outstanding.csv"))
+    if not args.skip_stats:
+        # NOTE: the exact stats1 key for outstanding funding size is not confirmed
+        # (funding doesn't have a long/short direction like margin positions do,
+        # so the ":long" suffix used for position-size keys is likely wrong here).
+        # This dataset is secondary/optional -- if it comes back empty, that's a
+        # known gap, not a blocker; funding_trades + candles + BTC price are the
+        # datasets the forecasting work actually depends on.
+        fetch_stats(f"funding.size:1m:{args.symbol}", start_dt, end_dt,
+                    os.path.join(OUT_DIR, "funding_size_outstanding.csv"))
 
-    fetch_candles("tBTCUSD", start_dt, end_dt,
-                  os.path.join(OUT_DIR, "btc_price_daily.csv"), timeframe="1D")
+    if not args.skip_btc:
+        fetch_candles("tBTCUSD", start_dt, end_dt,
+                      os.path.join(OUT_DIR, "btc_price_daily.csv"), timeframe="1D")
 
     if args.api_key and args.api_secret:
         fetch_own_funding_trades(args.symbol, args.api_key, args.api_secret,

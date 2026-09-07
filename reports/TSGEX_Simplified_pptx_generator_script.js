@@ -166,7 +166,7 @@ function explainer(s, x, y, w, h, term, plain) {
     s.addText(q, { x: 0.6, y: qy, w: PW - 1.2, h: 0.5, fontFace: FONT, fontSize: 14, color: SLATE, isTextBox: true, margin: 0 });
     qy += 0.55;
   });
-  footer(s, "2 / 11");
+  footer(s, "2 / 12");
 }
 
 /* ============ SLIDE 3: FIVE METHODS OVERVIEW ============ */
@@ -178,8 +178,8 @@ function explainer(s, x, y, w, h, term, plain) {
     { n: "①", t: "Bitfinex\n美元出借", d: "把美元借給有抵押品的\n槓桿交易者賺利息", risk: "風險：低", color: GOOD, fill: LIGHT_TINT },
     { n: "②", t: "OKX\n活期理財", d: "錢存進交易所資金池，\n類似活存，隨時可領回", risk: "風險：低", color: GOOD, fill: LIGHT_TINT2 },
     { n: "③", t: "Binance\n活期理財", d: "同上，另一家交易所，\n可互相備援", risk: "風險：低", color: GOOD, fill: LIGHT_TINT2 },
-    { n: "④", t: "OKX\n雙幣理財", d: "跟平台「賭」一個價格，\n賭錯要被迫換成別的資產", risk: "風險：較高", color: AMBER, fill: LIGHT_TINT },
-    { n: "⑤", t: "Binance\n雙幣理財", d: "同上，另一家交易所，\n機制幾乎相同", risk: "風險：較高", color: AMBER, fill: LIGHT_TINT },
+    { n: "④", t: "OKX\n雙幣理財", d: "跟平台約定一個價格賺利息，\n搭配對的操作方式風險可控", risk: "風險：中等", color: AMBER, fill: LIGHT_TINT },
+    { n: "⑤", t: "Binance\n雙幣理財", d: "同上，另一家交易所，\n機制幾乎相同", risk: "風險：中等", color: AMBER, fill: LIGHT_TINT },
   ];
   const cw = 2.32, gap = 0.16, startX = 0.6, y0 = 1.75, ch = 3.55;
   items.forEach((it, i) => {
@@ -195,7 +195,7 @@ function explainer(s, x, y, w, h, term, plain) {
   s.addText("「風險：低」不代表零風險——仍有交易所信用風險；詳細說明在後面各方法的頁面", {
     x: 0.6, y: 5.55, w: PW - 1.2, h: 0.4, fontFace: FONT, fontSize: 11, color: MUTED, italic: true, isTextBox: true, margin: 0,
   });
-  footer(s, "3 / 11");
+  footer(s, "3 / 12");
 }
 
 /* ============ SLIDE 4: BITFINEX ============ */
@@ -218,7 +218,7 @@ function explainer(s, x, y, w, h, term, plain) {
   card(s, 8.95, 3.6, 3.78, 2.35, "白話重點",
     "• 賺的是「利息」，不是賭價格漲跌\n• 本金不會因為比特幣漲跌而變少\n• 最大風險是「平台本身」出事（詳見第9頁）",
     { fill: LIGHT_TINT, bodySize: 11.5 });
-  footer(s, "4 / 11");
+  footer(s, "4 / 12");
 }
 
 /* ============ SLIDE 5: CEX FLEXIBLE SAVINGS ============ */
@@ -242,16 +242,16 @@ function explainer(s, x, y, w, h, term, plain) {
   card(s, 6.9, 5.35, 5.83, 1.5, "這類方法的價值在哪？",
     "利率雖然不高，但「隨時可以領回」，適合當作臨時要用錢時的備援資金池，而不是主力賺利息的方法。",
     { fill: LIGHT_TINT2, bodySize: 11.5 });
-  footer(s, "5 / 11");
+  footer(s, "5 / 12");
 }
 
 /* ============ SLIDE 6: DUAL INVESTMENT ============ */
 {
   const s = newSlide();
-  sectionTitle(s, "方法④⑤ 雙幣理財（OKX／Binance）", "白話說明：本質是「跟平台對賭一個價格」，不是單純的利息");
+  sectionTitle(s, "方法④⑤ 雙幣理財（OKX／Binance）", "白話說明：跟平台約定一個價格賺利息，五種方法中年化最高，但要搭配正確做法");
 
   explainer(s, 0.6, 1.65, PW - 1.2, 1.55, "這是什麼？（選擇權權利金 Option Premium）",
-    "你先約定一個「目標價格」，平台付你一筆錢（類似保險公司收的保費，這裡反過來是你收錢）。如果到期時價格沒有跌破（或漲破）目標價，你連本金帶「利息」全部拿回；但如果價格跌破（或漲破）目標價，你的本金會被「強制」換成當時已經比較不划算的另一種資產——等於你被迫低價買進或高價賣出。");
+    "你先約定一個「目標價格」，平台付你一筆錢（類似保險公司收的保費，這裡反過來是你收錢）。如果到期時價格沒有跌破（或漲破）目標價，你連本金帶「利息」全部拿回；但如果價格跌破（或漲破）目標價，你的本金會被「強制」換成當時已經比較不划算的另一種資產——等於你被迫低價買進或高價賣出。這時候不用急著認賠，換個方式繼續操作即可（下一頁說明）。");
 
   stdTable(s, [
     ["結果", "情境", "NT$500萬，一週後大約變成"],
@@ -261,9 +261,33 @@ function explainer(s, x, y, w, h, term, plain) {
   ], { x: 0.6, y: 3.4, w: PW - 1.2, colW: [3.6, 3.53, 3.6], fontSize: 11.5, rowH: 0.62 });
 
   card(s, 0.6, 5.6, PW - 1.2, 1.25, "白話重點",
-    "廣告上看到的「年化 45%」，其實是「賭對了」才有的報酬；一旦賭錯，本金可能一週內就虧損 20% 以上——這是五種方法中，唯一「本金會因為市場漲跌而實際變少」的方法。",
+    "廣告上看到的「年化 45%」，是「猜對方向」才有的報酬；猜錯的那一週帳面會變少，但不是永久的損失——只要不急著認賠賣掉，換個方式繼續操作，通常可以把本金拿回來，詳見下一頁。",
     { fill: LIGHT_TINT, bodySize: 12.5 });
-  footer(s, "6 / 11");
+  footer(s, "6 / 12");
+}
+
+/* ============ SLIDE 6B: TAKE-PROFIT DISCIPLINE (plain language) ============ */
+{
+  const s = newSlide();
+  sectionTitle(s, "雙幣理財怎麼玩比較安全？一個簡單的紀律", "測試了整整一年、兩萬種可能的走勢，找到一個關鍵做法");
+
+  explainer(s, 0.6, 1.65, PW - 1.2, 1.6, "如果猜錯方向，錢被換成別的資產，接下來怎麼辦？",
+    "不要急著認賠賣掉。改用手上這批資產，重新約定「原本那個價格」繼續賺利息——只要之後價格漲回原本那個價格，就能把錢全部換回來，而且中間收的利息全部歸你，本金完全不會少。這個做法我們稱為「滾動操作」。");
+
+  stdTable(s, [
+    ["做法", "一整年下來，錢變少的機率"],
+    ["猜錯了就一直用最新價格重新開始（不建議）", "74.5% ～ 85.1%"],
+    ["猜錯了先滾動操作，等本金拿回來就先收手、不馬上再下注", "18.9% ～ 20.4%"],
+  ], { x: 0.6, y: 3.55, w: PW - 1.2, colW: [6.5, 6.13], fontSize: 12, rowH: 0.75, centerCols: [1] });
+
+  statCallout(s, 0.6, 5.15, 3.9, 1.6, "只多做一件事", "把「錢變少的機率」從7～8成\n降到約2成", { valueSize: 18, valueColor: GOOD });
+  card(s, 4.7, 5.15, 3.9, 1.6, "這一件事是什麼？",
+    "本金拿回來以後，先把錢放著（賺其他方法的利息），不要立刻又下一注——這是唯一的差別。",
+    { fill: LIGHT_TINT, bodySize: 11.5 });
+  card(s, 8.7, 5.15, 4.03, 1.6, "白話結論",
+    "雙幣理財不是不能碰，是不能「一直重複下注」；照這個紀律操作，用NT$500萬的一部分來做，是合理的選項。",
+    { fill: LIGHT_TINT2, bodySize: 11 });
+  footer(s, "7 / 12");
 }
 
 /* ============ SLIDE 7: COMPARISON TABLE ============ */
@@ -276,14 +300,14 @@ function explainer(s, x, y, w, h, term, plain) {
     ["① Bitfinex 出借", "借錢的利息", "不會", "數天～數月不等", "4.25%–17%+"],
     ["② OKX 活期", "存款的利差", "不會（幣值本身穩定）", "隨時", "約 3.0%"],
     ["③ Binance 活期", "存款的利差", "不會（幣值本身穩定）", "隨時", "約 1.5%"],
-    ["④ OKX 雙幣理財", "賭價格的「保費」", "會，可能大跌", "要等到結算日", "名目 4%–138%"],
-    ["⑤ Binance 雙幣理財", "賭價格的「保費」", "會，可能大跌", "要等到結算日", "官方 4%–138%"],
+    ["④ OKX 雙幣理財", "猜價格的「獎金」", "會，猜錯先變少", "要等到結算日", "名目 4%–138%"],
+    ["⑤ Binance 雙幣理財", "猜價格的「獎金」", "會，猜錯先變少", "要等到結算日", "官方 4%–138%"],
   ], { x: 0.6, y: 1.7, w: PW - 1.2, colW: [2.4, 2.1, 2.83, 2.0, 2.0], fontSize: 10.5, rowH: 0.68 });
 
   card(s, 0.6, 6.05, PW - 1.2, 0.85, null,
-    "簡單說：①②③賺的是「利息」，本金不會因為比特幣漲跌而變少；④⑤賺的是「賭對價格的獎金」，本金可能因為賭錯而實際變少。",
+    "簡單說：①②③賺的是「利息」，本金不會因為比特幣漲跌而變少；④⑤賺的是「猜對價格的獎金」，猜錯本金會暫時變少，但只要照第7頁的紀律操作，一年下來變少的機率可以壓到約2成。",
     { fill: LIGHT_TINT, bodySize: 12 });
-  footer(s, "7 / 11");
+  footer(s, "8 / 12");
 }
 
 /* ============ SLIDE 8: NT$5M SUMMARY CHART ============ */
@@ -313,7 +337,7 @@ function explainer(s, x, y, w, h, term, plain) {
   card(s, 9.0, 3.85, 3.73, 2.05, "務實的看法",
     "①Bitfinex 出借在「不賭價格」的前提下，一年約 NT$51 萬，是五種方法中「報酬與安全」平衡最好的選項。",
     { fill: LIGHT_TINT2, bodySize: 11.5 });
-  footer(s, "8 / 11");
+  footer(s, "9 / 12");
 }
 
 /* ============ SLIDE 9: ALLOCATION MODELS ============ */
@@ -347,7 +371,7 @@ function explainer(s, x, y, w, h, term, plain) {
   card(s, 0.6, 5.1, PW - 1.2, 1.6, "怎麼選？",
     "如果這筆錢是「不能有本金損失」的閒錢，建議從方案A開始；如果可以承受「部分金額因賭錯而暫時變少」，再考慮拉高④⑤的比重。三個方案僅為示範權重，實際比重應由財務部與風控委員會依風險承受度共同核定。",
     { fill: LIGHT_TINT2, bodySize: 12 });
-  footer(s, "9 / 11");
+  footer(s, "10 / 12");
 }
 
 /* ============ SLIDE 10: IMPORTANT REMINDERS ============ */
@@ -368,7 +392,7 @@ function explainer(s, x, y, w, h, term, plain) {
     s.addText(r[1], { x: 4.15, y: y - 0.02, w: 8.55, h: 0.9, fontFace: FONT, fontSize: 11.5, color: SLATE, isTextBox: true, margin: 0, valign: "middle", lineSpacingMultiple: 1.2 });
     y += 1.05;
   });
-  footer(s, "10 / 11");
+  footer(s, "11 / 12");
 }
 
 /* ============ SLIDE 11: NEXT STEPS ============ */
@@ -401,7 +425,7 @@ function explainer(s, x, y, w, h, term, plain) {
     "這 NT$500 萬額度是否核准？想從哪個方案（A／B／C）開始試做？對「雙幣理財」的比重是否有上限要求？",
     { x: 0.6, y: 5.55, w: PW - 1.2, h: 0.7, fontFace: FONT, fontSize: 13.5, color: SLATE, isTextBox: true, margin: 0, lineSpacingMultiple: 1.3 }
   );
-  footer(s, "11 / 11");
+  footer(s, "12 / 12");
 }
 
 pres.writeFile({ fileName: process.argv[2] || "output.pptx" }).then((fileName) => {

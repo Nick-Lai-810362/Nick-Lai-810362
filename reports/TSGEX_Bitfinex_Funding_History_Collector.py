@@ -87,8 +87,17 @@ OUT_DIR = "bfx_funding_data"
 REQUEST_SLEEP_SEC = 1.5  # conservative pacing to stay under public rate limits
 
 
+COMMON_HEADERS = {
+    "Accept": "application/json",
+    # Bitfinex's edge (Cloudflare) blocks the default urllib UA as a bot;
+    # a normal browser UA gets through.
+    "User-Agent": ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"),
+}
+
+
 def _get(url: str):
-    req = urllib.request.Request(url, headers={"Accept": "application/json"})
+    req = urllib.request.Request(url, headers=COMMON_HEADERS)
     for attempt in range(5):
         try:
             with urllib.request.urlopen(req, timeout=20) as resp:
@@ -97,6 +106,11 @@ def _get(url: str):
             if e.code == 429:
                 wait = 5 * (attempt + 1)
                 print(f"  rate-limited (429), backing off {wait}s...")
+                time.sleep(wait)
+                continue
+            if e.code == 403:
+                wait = 5 * (attempt + 1)
+                print(f"  got 403 (attempt {attempt+1}/5), backing off {wait}s and retrying...")
                 time.sleep(wait)
                 continue
             raise
@@ -111,6 +125,7 @@ def _signed_post(endpoint: str, api_key: str, api_secret: str, body: dict = None
     sig_payload = f"{path}{nonce}{body_json}"
     sig = hmac.new(api_secret.encode(), sig_payload.encode(), hashlib.sha384).hexdigest()
     headers = {
+        **COMMON_HEADERS,
         "Content-Type": "application/json",
         "bfx-nonce": nonce,
         "bfx-apikey": api_key,

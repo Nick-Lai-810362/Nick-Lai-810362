@@ -84,7 +84,13 @@ from datetime import datetime, timedelta, timezone
 API_PUB = "https://api-pub.bitfinex.com"
 API_AUTH = "https://api.bitfinex.com"
 OUT_DIR = "bfx_funding_data"
-REQUEST_SLEEP_SEC = 1.5  # conservative pacing to stay under public rate limits
+# Observed in practice: Bitfinex's public trades/hist endpoint tolerates only
+# a handful of rapid requests before returning 429 -- 1.5s spacing wasn't
+# enough. Pace much more conservatively and give 429s a long runway of
+# retries with real backoff, since the alternative is aborting a multi-hour
+# pull partway through.
+REQUEST_SLEEP_SEC = 4.0
+MAX_ATTEMPTS = 12
 
 
 COMMON_HEADERS = {
@@ -98,19 +104,14 @@ COMMON_HEADERS = {
 
 def _get(url: str):
     req = urllib.request.Request(url, headers=COMMON_HEADERS)
-    for attempt in range(5):
+    for attempt in range(MAX_ATTEMPTS):
         try:
             with urllib.request.urlopen(req, timeout=20) as resp:
                 return json.loads(resp.read().decode())
         except urllib.error.HTTPError as e:
-            if e.code == 429:
-                wait = 5 * (attempt + 1)
-                print(f"  rate-limited (429), backing off {wait}s...")
-                time.sleep(wait)
-                continue
-            if e.code == 403:
-                wait = 5 * (attempt + 1)
-                print(f"  got 403 (attempt {attempt+1}/5), backing off {wait}s and retrying...")
+            if e.code in (429, 403):
+                wait = min(60, 8 * (attempt + 1))
+                print(f"  got {e.code} (attempt {attempt+1}/{MAX_ATTEMPTS}), backing off {wait}s...")
                 time.sleep(wait)
                 continue
             raise

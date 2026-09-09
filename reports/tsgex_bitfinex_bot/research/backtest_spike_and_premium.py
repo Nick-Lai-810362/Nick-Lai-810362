@@ -9,22 +9,43 @@ Same rigor as the earlier BTC technical-analysis backtest in this project:
   second half held out) to guard against data-snooping
 - compared against a naive "no change" baseline
 - report negative results as plainly as positive ones
+
+DATA: research/data/funding_candles_fUSD_p2.csv and _p30.csv, committed
+alongside this script for reproducibility. Collected 2026-09-07 via
+TSGEX_Bitfinex_Funding_History_Collector.py (5 years of hourly Bitfinex
+fUSD funding-rate candles at the 2-day and 30-day tenor buckets). Override
+the location with --data-dir or the BFX_RESEARCH_DATA_DIR env var if you
+have a fresher pull you want to re-run this against.
+
+DEPENDENCIES: pandas, numpy (`pip install pandas numpy`).
+
+USAGE: python backtest_spike_and_premium.py [--data-dir PATH]
 """
+import argparse
+import os
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 
-UP = "/root/.claude/uploads/903f1bc7-ed04-5d1f-8ff5-3721a9aa7d5a"
+DEFAULT_DATA_DIR = Path(__file__).resolve().parent / "data"
 
 
-def load(name):
-    df = pd.read_csv(f"{UP}/{name}")
+def load(data_dir: Path, filename: str, series_name: str):
+    df = pd.read_csv(data_dir / filename)
     df["timestamp_utc"] = pd.to_datetime(df["timestamp_utc"])
     df = df.sort_values("timestamp_utc").drop_duplicates("timestamp_utc").set_index("timestamp_utc")
-    return df["close"].rename(name.split("_")[2].split(".")[0])
+    return df["close"].rename(series_name)
 
 
-p2 = load("957157e1-funding_candles_fUSD_p2.csv")
-p30 = load("263464c9-funding_candles_fUSD_p30.csv")
+ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+ap.add_argument("--data-dir", default=os.environ.get("BFX_RESEARCH_DATA_DIR", str(DEFAULT_DATA_DIR)),
+                 help=f"Directory containing funding_candles_fUSD_p2.csv and _p30.csv (default: {DEFAULT_DATA_DIR})")
+args = ap.parse_args()
+data_dir = Path(args.data_dir)
+
+p2 = load(data_dir, "funding_candles_fUSD_p2.csv", "p2")
+p30 = load(data_dir, "funding_candles_fUSD_p30.csv", "p30")
 
 # hourly grid, forward-filled up to 6h gaps (thin market -> some hours have no trade)
 idx = pd.date_range(p2.index.min(), p2.index.max(), freq="1h", tz="UTC")

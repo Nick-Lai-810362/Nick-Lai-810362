@@ -83,6 +83,31 @@ MODEL (only its documented reserve-capital BEHAVIOR is approximated here),
 and Fuly's exact proprietary rate/tenor breakpoint curve (approximated with
 the TSGEX report's own governance ladder, marked wherever it is used).
 
+WHERE THIS GOES BEYOND FULY'S DOCUMENTED BEHAVIOR
+----------------------------------------------------
+Three additions below are NOT things Fuly's public docs describe them doing,
+and don't require any predictive edge to be valuable -- they're structural:
+
+  1. --mode barbell: splits lendable capital between a short-tenor bucket
+     (stays liquid) and a long-tenor bucket (locks in today's rate),
+     skipping the middle. Fuly's documented modes all commit one cycle's
+     capital to a single tenor bracket.
+  2. Every rate-based decision (floor check, tenor selection, jump
+     strategy) runs on the NET-of-platform-fee rate (net_apr()), not the
+     gross quoted rate. Bitfinex takes 15%/18% of interest EARNED
+     (standard/hidden offers) -- decisions here are made on what actually
+     lands in the account.
+  3. Every cycle appends a structured, human-readable JSON-lines record to
+     --audit-log (what rate was observed, what was decided, and why) --
+     Fuly is a closed SaaS with no equivalent decision trail, which matters
+     for an institutional treasury's internal audit/risk sign-off
+     independent of realized return.
+
+None of this is a claim that this bot earns a higher realized yield than
+Fuly's actual (undisclosed) engine -- that can only be established with a
+real backtest against real historical funding-rate data, which is a
+separate, in-progress effort (see TSGEX_Bitfinex_Funding_History_Collector.py).
+
 SAFETY DEFAULTS
 ----------------
 - dry-run by default; --live requires real credentials via env vars
@@ -139,6 +164,7 @@ import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Optional
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s  %(levelname)-7s  %(message)s")
@@ -155,7 +181,29 @@ BFX_MIN_ORDER_USD = 150.0  # Bitfinex's own funding-offer minimum; documented au
 class StrategyConfig:
     capital: float
     symbol: str = "fUSD"
-    mode: str = "dave_high"  # "dave_high" | "dave_fast" | "custom" | "frr"
+    mode: str = "dave_high"  # "dave_high" | "dave_fast" | "custom" | "frr" | "barbell"
+
+    # Bitfinex charges a platform fee on funding INTEREST EARNED (not principal):
+    # 15% on standard visible offers, 18% on hidden offers (per TSGEX report
+    # Section 2). floor_rate and every rate-based decision below is evaluated
+    # NET of this fee -- what actually lands in the account -- not the gross
+    # quoted rate. Many retail tools only show the fee in a UI footnote while
+    # the underlying tenor/split logic still decides on the gross number;
+    # deciding on the net number is a structural improvement over that.
+    platform_fee_standard: float = 0.15
+    platform_fee_hidden: float = 0.18
+    order_visibility: str = "standard"  # "standard" | "hidden"
+
+    # Barbell allocation ("barbell" mode): split lendable capital between a
+    # short-tenor bucket (stays liquid, can redeploy fast if rates jump) and
+    # a long-tenor bucket (locks in today's rate), skipping the middle --
+    # a standard fixed-income portfolio construction technique that improves
+    # risk-adjusted return WITHOUT requiring a correct rate-direction
+    # forecast. Fuly's own documented modes (Dave High/Fast, custom) all
+    # commit the whole cycle's capital to ONE tenor bracket; this does not.
+    barbell_short_fraction: float = 0.5
+
+    audit_log_path: Optional[str] = "bfx_bot_audit_log.jsonl"
 
     # Documented UI knobs
     floor_rate: float = 0.05          # 利率下限, Fuly's own suggested default (5% APR)
@@ -204,6 +252,32 @@ def default_max_amount_per_order(capital: float) -> float:
     """Fuly's guidance is 'set per-order size to 150-1,000 depending on your
     total capital.' Linearly interpolate within that documented range."""
     return min(1000.0, max(BFX_MIN_ORDER_USD, capital / 1000.0))
+
+
+def platform_fee(cfg: "StrategyConfig") -> float:
+    return cfg.platform_fee_hidden if cfg.order_visibility == "hidden" else cfg.platform_fee_standard
+
+
+def net_apr(gross_apr: float, cfg: "StrategyConfig") -> float:
+    """What actually lands in the account after Bitfinex's platform cut on
+    interest earned. All rate-based decisions in this script (floor check,
+    tenor selection, jump strategy) are evaluated on THIS number, not the
+    gross quoted rate."""
+    return gross_apr * (1 - platform_fee(cfg))
+
+
+def write_audit_log(cfg: "StrategyConfig", record: dict):
+    """Append one fully-replayable JSON line per cycle: what was observed,
+    what was decided, and why. Fuly is a closed SaaS black box -- a
+    treasury desk can't see why it picked a given rate/tenor on a given
+    day. Every decision this bot makes is logged here in human-readable
+    form, which is what an internal audit/risk sign-off actually needs,
+    independent of whether the realized return ever beats Fuly's."""
+    if not cfg.audit_log_path:
+        return
+    record = {"ts_utc": datetime.now(timezone.utc).isoformat(), **record}
+    with open(cfg.audit_log_path, "a") as f:
+        f.write(json.dumps(record, ensure_ascii=False) + "\n")
 
 
 # ---------------------------------------------------------------------------
@@ -415,35 +489,84 @@ def build_tranches(capital: float, best_daily_rate: float, cfg: StrategyConfig):
     return tranches
 
 
+def _place(client: BitfinexClient, cfg: StrategyConfig, live: bool, amount: float, rate: float, tenor: int, label: str = ""):
+    """Places (or logs, in dry-run) one tranche and returns a record dict for
+    the audit log."""
+    implied_gross_apr = rate * 365
+    if live:
+        client.submit_funding_offer(cfg.symbol, amount, rate, tenor)
+    else:
+        log.info(f"  [DRY-RUN]{label} would place: amount={amount:,.2f}  "
+                 f"daily_rate={rate:.6f} (~{implied_gross_apr:.2%} gross APR / "
+                 f"~{net_apr(implied_gross_apr, cfg):.2%} net)  period={tenor}d")
+    return {"amount": amount, "daily_rate": rate, "gross_apr": implied_gross_apr,
+            "net_apr": net_apr(implied_gross_apr, cfg), "period_days": tenor, "label": label}
+
+
 # ---------------------------------------------------------------------------
 # Main strategy loop -- dispatches on cfg.mode
 # ---------------------------------------------------------------------------
 def run_cycle(client: BitfinexClient, cfg: StrategyConfig, rate_history: list, live: bool):
+    reasoning = []
     book = client.get_funding_book(cfg.symbol)
     if not book:
         log.warning("Empty funding book response, skipping cycle")
+        write_audit_log(cfg, {"mode": cfg.mode, "action": "skip", "reason": "empty_funding_book"})
         return
     best_daily_rate = book[0][0]
-    apr = best_daily_rate * 365
-    rate_history.append(apr)
+    gross_apr = best_daily_rate * 365
+    net = net_apr(gross_apr, cfg)
+    rate_history.append(gross_apr)
+    reasoning.append(f"best matchable gross rate {gross_apr:.2%} APR; net of "
+                      f"{platform_fee(cfg):.0%} platform fee ({cfg.order_visibility}) = {net:.2%} APR")
 
     lendable = max(0.0, cfg.capital - cfg.reserved_amount)
-    if apr < cfg.floor_rate:
-        log.info(f"Best rate {apr:.2%} APR is below floor_rate {cfg.floor_rate:.2%} -- holding, no orders this cycle")
+    if net < cfg.floor_rate:
+        reasoning.append(f"net rate {net:.2%} below floor_rate {cfg.floor_rate:.2%} -> holding, no orders")
+        log.info(f"Net rate {net:.2%} APR (gross {gross_apr:.2%}) is below floor_rate {cfg.floor_rate:.2%} "
+                 f"-- holding, no orders this cycle")
+        write_audit_log(cfg, {"mode": cfg.mode, "action": "hold", "gross_apr": gross_apr, "net_apr": net,
+                               "reasoning": reasoning})
         return
 
     if cfg.mode == "frr":
-        tenor = apply_jump_strategy(apr, cfg.min_tenor_days, cfg)
-        log.info(f"[FRR mode] Best FRR-referenced rate: {apr:.2%} APR  chosen_tenor={tenor}d (floats hourly)")
+        tenor = apply_jump_strategy(net, cfg.min_tenor_days, cfg)
+        log.info(f"[FRR mode] Best FRR-referenced rate: {gross_apr:.2%} gross / {net:.2%} net APR  "
+                 f"chosen_tenor={tenor}d (floats hourly)")
         if live:
             client.submit_frr_offer(cfg.symbol, lendable, tenor)
         else:
             log.info(f"  [DRY-RUN] would place FRR-pegged offer: amount={lendable:,.2f}  period={tenor}d")
+        write_audit_log(cfg, {"mode": cfg.mode, "action": "place_frr", "amount": lendable, "period_days": tenor,
+                               "gross_apr": gross_apr, "net_apr": net, "reasoning": reasoning})
         return
 
     spike = compute_spike_signal(rate_history, cfg)
-    tenor = select_tenor(apr, cfg)
-    tenor = apply_jump_strategy(apr, tenor, cfg)
+    tenor = select_tenor(net, cfg)
+    tenor = apply_jump_strategy(net, tenor, cfg)
+
+    if cfg.mode == "barbell":
+        # Split lendable capital into a short-tenor bucket (liquidity, can
+        # redeploy fast) and a long-tenor bucket (locks in today's rate),
+        # skipping the middle -- doesn't require forecasting rate direction.
+        short_capital = lendable * cfg.barbell_short_fraction
+        long_capital = lendable - short_capital
+        short_tenor = apply_jump_strategy(net, cfg.normal_tenor_days[0], cfg)
+        long_lo, long_hi = cfg.extreme_tenor_days if cfg.authorize_extreme_tenor else cfg.elevated_tenor_days
+        long_tenor = round((long_lo + long_hi) / 2)
+        reasoning.append(f"barbell split: {cfg.barbell_short_fraction:.0%} short ({short_tenor}d) / "
+                          f"{1-cfg.barbell_short_fraction:.0%} long ({long_tenor}d), middle tenors skipped")
+        log.info(f"[Barbell mode] short_capital={short_capital:,.2f}@{short_tenor}d  "
+                 f"long_capital={long_capital:,.2f}@{long_tenor}d  net_apr={net:.2%}")
+        placed = []
+        for amount, rate in build_tranches(short_capital, best_daily_rate, cfg):
+            placed.append(_place(client, cfg, live, amount, rate, short_tenor, label="[short]"))
+        for amount, rate in build_tranches(long_capital, best_daily_rate, cfg):
+            placed.append(_place(client, cfg, live, amount, rate, long_tenor, label="[long]"))
+        write_audit_log(cfg, {"mode": cfg.mode, "action": "place_barbell", "gross_apr": gross_apr, "net_apr": net,
+                               "short_tenor": short_tenor, "long_tenor": long_tenor, "tranches": placed,
+                               "reasoning": reasoning})
+        return
 
     if cfg.mode == "dave_high":
         # FBRR-style behavior: when the spike-proxy fires, hold back capital
@@ -451,6 +574,8 @@ def run_cycle(client: BitfinexClient, cfg: StrategyConfig, rate_history: list, l
         if spike:
             reserve_now = lendable * cfg.fbrr_reserve_fraction
             lendable -= reserve_now
+            reasoning.append(f"spike-proxy fired -> reserving {reserve_now:,.2f} "
+                              f"({cfg.fbrr_reserve_fraction:.0%} of lendable capital)")
             log.info(f"  [Dave High-Rate mode] spike-proxy fired -> reserving {reserve_now:,.2f} "
                      f"({cfg.fbrr_reserve_fraction:.0%} of lendable capital) for an anticipated rate increase")
         chosen_rate = best_daily_rate
@@ -460,38 +585,35 @@ def run_cycle(client: BitfinexClient, cfg: StrategyConfig, rate_history: list, l
         dave_high_rate = best_daily_rate + cfg.tranche_rate_step_apr / 365
         chosen_rate = min(best_daily_rate, dave_high_rate)
         tenor = cfg.min_tenor_days
+        reasoning.append(f"Dave Fast: single tranche at ~{chosen_rate*365:.2%} gross APR, {tenor}d, "
+                          f"capped to never exceed Dave High's rate")
         log.info(f"  [Dave Fast mode] optimizing for speed: single near-immediate tranche at "
                  f"~{chosen_rate*365:.2%} APR, {tenor}d tenor")
-        if live:
-            client.submit_funding_offer(cfg.symbol, lendable, chosen_rate, tenor)
-        else:
-            log.info(f"  [DRY-RUN] would place: amount={lendable:,.2f}  "
-                     f"daily_rate={chosen_rate:.6f} (~{chosen_rate*365:.2%} APR)  period={tenor}d")
+        rec = _place(client, cfg, live, lendable, chosen_rate, tenor)
+        write_audit_log(cfg, {"mode": cfg.mode, "action": "place", "gross_apr": gross_apr, "net_apr": net,
+                               "tranches": [rec], "reasoning": reasoning})
         return
     else:  # custom
         chosen_rate = best_daily_rate
 
-    log.info(f"Best rate: {apr:.2%} APR (daily={best_daily_rate:.6f})  "
+    log.info(f"Best rate: {gross_apr:.2%} gross / {net:.2%} net APR  "
              f"mode={cfg.mode}  spike_signal={spike}  chosen_tenor={tenor}d")
 
     tranches = build_tranches(lendable, chosen_rate, cfg)
     log.info(f"Inverted-pyramid split: {len(tranches)} tranches "
              f"(per-order size ~{cfg.max_amount_per_order or default_max_amount_per_order(cfg.capital):,.0f} USD)")
-    for amount, rate in tranches:
-        implied_apr = rate * 365
-        if live:
-            client.submit_funding_offer(cfg.symbol, amount, rate, tenor)
-        else:
-            log.info(f"  [DRY-RUN] would place: amount={amount:,.2f}  "
-                     f"daily_rate={rate:.6f} (~{implied_apr:.2%} APR)  period={tenor}d")
+    placed = [_place(client, cfg, live, amount, rate, tenor) for amount, rate in tranches]
+    write_audit_log(cfg, {"mode": cfg.mode, "action": "place", "gross_apr": gross_apr, "net_apr": net,
+                           "spike_signal": spike, "tenor": tenor, "tranches": placed, "reasoning": reasoning})
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--capital", type=float, required=True, help="Total USD capital to allocate")
     ap.add_argument("--symbol", default="fUSD")
-    ap.add_argument("--mode", choices=["dave_high", "dave_fast", "custom", "frr"], default="dave_high")
-    ap.add_argument("--floor-rate", type=float, default=0.05, help="利率下限, Fuly's documented default is 5%% APR")
+    ap.add_argument("--mode", choices=["dave_high", "dave_fast", "custom", "frr", "barbell"], default="dave_high")
+    ap.add_argument("--floor-rate", type=float, default=0.05,
+                     help="利率下限 evaluated NET of the platform fee (Fuly's documented default is 5%% APR gross)")
     ap.add_argument("--reserved-amount", type=float, default=0.0, help="保留金額, capital to always keep unlent")
     ap.add_argument("--max-amount-per-order", type=float, default=None,
                      help="每筆金額上限 (documented range: 150-1000). Default: scaled from --capital.")
@@ -499,6 +621,12 @@ def main():
                      help="Allow 60-120 day tenor at APR>=30%% (requires risk-officer sign-off per governance policy)")
     ap.add_argument("--jump-strategy-threshold", type=float, default=0.10,
                      help="跳跳樂 threshold APR; Fuly's documented example is ~10%%")
+    ap.add_argument("--order-visibility", choices=["standard", "hidden"], default="standard",
+                     help="Bitfinex platform fee on interest earned: 15%% standard / 18%% hidden offers")
+    ap.add_argument("--barbell-short-fraction", type=float, default=0.5,
+                     help="--mode barbell only: fraction of lendable capital in the short-tenor bucket")
+    ap.add_argument("--audit-log", default="bfx_bot_audit_log.jsonl",
+                     help="Path to the JSON-lines decision audit log (pass '' to disable)")
     ap.add_argument("--live", action="store_true", help="Actually place orders (default: dry-run)")
     ap.add_argument("--mock", action="store_true", help="Use synthetic funding book, no network/credentials needed")
     ap.add_argument("--cycles", type=int, default=1, help="Number of poll cycles to run (mock/demo use)")
@@ -514,6 +642,9 @@ def main():
         max_amount_per_order=args.max_amount_per_order,
         authorize_extreme_tenor=args.authorize_extreme_tenor,
         jump_strategy_threshold_apr=args.jump_strategy_threshold,
+        order_visibility=args.order_visibility,
+        barbell_short_fraction=args.barbell_short_fraction,
+        audit_log_path=args.audit_log or None,
     )
 
     if args.mock:

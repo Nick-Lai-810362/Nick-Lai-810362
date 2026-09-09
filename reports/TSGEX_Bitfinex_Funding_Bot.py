@@ -187,7 +187,7 @@ EXTREME_TENOR = 120
 # refresh by re-analyzing a fresh pull from the collector script.
 TENOR_TYPICAL_ORDER_SIZE = {2: 700.0, 7: 500.0, 30: 300.0, EXTREME_TENOR: 300.0}
 
-SUBMIT_PACING_SEC = 0.3  # live-mode only; Bitfinex's documented request-rate limit is 10-90/min
+SUBMIT_PACING_SEC = 1.0  # live-mode only; 1/sec = 60/min, safely inside Bitfinex's documented 10-90/min
 
 
 # ---------------------------------------------------------------------------
@@ -210,7 +210,18 @@ class StrategyConfig:
     authorize_extreme_tenor: bool = False  # gate for the 120d bucket (never used unless explicitly set)
     barbell_short_fraction: float = 0.5    # --mode barbell only: split between the 2d and 30d buckets
 
-    max_orders_per_cycle: int = 30
+    # Safety bound on tranche count, NOT a Bitfinex-imposed limit (none is
+    # published -- see docstring #4). Exists only so a truly extreme capital
+    # amount can't generate an unbounded number of orders in one cycle. Set
+    # high enough that a NT$5,000,000-scale account (~USD 158,730) placing
+    # 100% into the 2-day bucket (227 tranches at the real $700 typical
+    # order size) is NOT truncated -- a lower default here would silently
+    # override the per-tenor calibration and defeat the point of it (this
+    # was in fact a real bug in the previous default of 30, caught by
+    # checking this exact NT$5M scenario: it collapsed 227 calibrated
+    # tranches into 30 oversized ones, averaging $5,291/tranche -- above
+    # even the 90th-percentile real 2-day trade size).
+    max_orders_per_cycle: int = 400
     tranche_rate_step_apr: float = 0.01
     tranche_weight_base: float = 0.8
     tranche_weight_step: float = 0.2
@@ -688,6 +699,10 @@ def main():
                      help="Allow the 120d bucket (measured no rate premium over 30d in 5y of data -- "
                           "opt-in only, e.g. for a specific large block trade)")
     ap.add_argument("--barbell-short-fraction", type=float, default=0.5)
+    ap.add_argument("--max-orders-per-cycle", type=int, default=400,
+                     help="Safety bound on tranche count per cycle (not a Bitfinex-imposed limit -- "
+                          "none is published). Lower this only if you deliberately want fewer, larger "
+                          "tranches than the real per-tenor trade-size calibration would produce.")
     ap.add_argument("--order-visibility", choices=["standard", "hidden"], default="standard")
     ap.add_argument("--state-file", default="bfx_bot_state.json")
     ap.add_argument("--contribute", type=float, default=0.0,
@@ -709,7 +724,8 @@ def main():
     cfg = StrategyConfig(
         symbol=args.symbol, mode=args.mode, floor_rate=args.floor_rate, reserved_amount=args.reserved_amount,
         term_premium_min_pp=args.term_premium_min_pp, authorize_extreme_tenor=args.authorize_extreme_tenor,
-        barbell_short_fraction=args.barbell_short_fraction, order_visibility=args.order_visibility,
+        barbell_short_fraction=args.barbell_short_fraction, max_orders_per_cycle=args.max_orders_per_cycle,
+        order_visibility=args.order_visibility,
         state_path=args.state_file, audit_log_path=args.audit_log or None,
     )
 

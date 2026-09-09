@@ -40,6 +40,19 @@ def build_arg_parser() -> argparse.ArgumentParser:
     ap.add_argument("--term-premium-min-pp", type=float, default=0.02)
     ap.add_argument("--authorize-extreme-tenor", action="store_true")
     ap.add_argument("--barbell-short-fraction", type=float, default=0.5)
+    ap.add_argument("--max-total-shift-from-short", type=float, default=0.7,
+                     help="Max fraction of the short-tenor (anchor) allocation decide_tenor_allocation may "
+                          "shift away to longer tenors that clear --term-premium-min-pp, combined across all "
+                          "of them. The short bucket always keeps at least (1 - this).")
+    ap.add_argument("--min-period-depth-usd", type=float, default=1000.0,
+                     help="A tenor's live-book depth must clear this before capital can be shifted into it -- "
+                          "a rate quoted by a single thin order isn't reliably fillable at tranche scale.")
+    ap.add_argument("--tranche-sizing-mode", choices=["calibrated", "fixed_count"], default="calibrated",
+                     help="'calibrated' (default) sizes tranches against each tenor's real observed trade "
+                          "size, letting tranche count fall out of capital/typical-size. 'fixed_count' splits "
+                          "capital evenly across --max-concurrent-orders tranches instead.")
+    ap.add_argument("--max-concurrent-orders", type=int, default=20,
+                     help="Only used when --tranche-sizing-mode=fixed_count.")
     ap.add_argument("--max-orders-per-cycle", type=int, default=400)
     ap.add_argument("--max-wait-multiplier", type=float, default=1.0,
                      help=f"Scales the default per-tenor max-wait-before-cancel thresholds "
@@ -74,6 +87,8 @@ def config_from_args(args: argparse.Namespace) -> StrategyConfig:
         symbol=args.symbol, mode=args.mode, floor_rate=args.floor_rate, reserved_amount=args.reserved_amount,
         term_premium_min_pp=args.term_premium_min_pp, authorize_extreme_tenor=args.authorize_extreme_tenor,
         barbell_short_fraction=args.barbell_short_fraction, max_orders_per_cycle=args.max_orders_per_cycle,
+        max_total_shift_from_short=args.max_total_shift_from_short, min_period_depth_usd=args.min_period_depth_usd,
+        tranche_sizing_mode=args.tranche_sizing_mode, max_concurrent_orders=args.max_concurrent_orders,
         max_wait_multiplier=args.max_wait_multiplier, rate_drift_threshold_pp=args.rate_drift_threshold_pp,
         enable_spike_reserve=args.enable_spike_reserve,
         order_visibility=args.order_visibility, state_path=args.state_file, audit_log_path=args.audit_log or None,

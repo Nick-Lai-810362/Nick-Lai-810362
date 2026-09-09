@@ -153,6 +153,22 @@ def test_spike_reserve_can_be_explicitly_enabled():
     assert committed == pytest.approx(10_000.0 * (1 - cfg.fbrr_reserve_fraction), rel=1e-6)
 
 
+def test_fixed_count_tranche_mode_places_max_concurrent_orders_via_run_cycle():
+    """v5.2: end-to-end check that --tranche-sizing-mode=fixed_count actually
+    wires through run_cycle -- capital split evenly across
+    max_concurrent_orders tranches at the anchor (most liquid) tenor, instead
+    of the calibrated per-tenor typical-size count."""
+    cfg = StrategyConfig(mode="custom", tranche_sizing_mode="fixed_count", max_concurrent_orders=10,
+                          state_path="/tmp/_never_used9.json", audit_log_path=None)
+    state = BotState()
+    contribute_principal(state, 10_000.0)
+    client = MockBitfinexClient()
+    now = datetime(2026, 9, 9, tzinfo=timezone.utc)
+    run_cycle(client, cfg, state, [], now, live=False)
+    short_tenor_positions = [p for p in state.positions if p.tenor_days == min(p.tenor_days for p in state.positions)]
+    assert len(short_tenor_positions) == 10
+
+
 def test_dave_fast_places_exactly_one_tranche():
     cfg = StrategyConfig(mode="dave_fast", state_path="/tmp/_never_used6.json", audit_log_path=None)
     state = BotState()

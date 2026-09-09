@@ -1,5 +1,64 @@
 # Changelog
 
+## v5.2 (generalized N-tenor allocation, fixed_count tranche mode, rate-unit + min-order-size re-verification)
+
+Three follow-up questions from the user, answered by research where a claim
+needed verifying and by implementation where the feature was genuinely
+missing.
+
+**1. "Same-tenor tranche count could instead be a fixed number of concurrent
+orders, splitting total idle capital evenly?"** Added `StrategyConfig.
+tranche_sizing_mode`: `"calibrated"` (default, unchanged -- P75 real-trade-
+size inverted pyramid) or `"fixed_count"`, which splits a tenor bucket's
+capital evenly across `--max-concurrent-orders` tranches instead of deriving
+the count from calibration. Automatically reduces the count if capital/count
+would fall under Bitfinex's $150 minimum order size (`build_tranches_for_
+tenor` in `strategy.py`).
+
+**2. "Why only 2/7/30 days -- shouldn't 3,4,5,6,8,9,10...29 each get their own
+adaptive allocation?"** `best_rate_by_tenor()` no longer filters the live
+book to the fixed `TARGET_TENORS = (2, 7, 30)` shortlist -- it now returns
+every period actually quoted right now (Bitfinex accepts any period 2-120
+days). `decide_tenor_allocation()` was generalized to loop over however many
+periods are live: the shortest is the anchor, and each longer period
+(ascending) gets a share shifted from the anchor if its live net-APR premium
+over the anchor clears `--term-premium-min-pp`, up to a new `--max-total-
+shift-from-short` cap (default 0.7, extracted from what was previously a
+hardcoded literal) so the most liquid tenor is never fully vacated. A new
+`depth_by_tenor()` + `--min-period-depth-usd` (default $1,000) filter skips
+any period whose current book depth is too thin to reliably fill a real
+tranche against -- necessary now that the book isn't pre-filtered to only
+the three tenors known to be liquid (v4 finding #1: liquidity is 89.6%
+concentrated at 2d; most other periods are quoted by only a handful of
+participants). `MockBitfinexClient` now also generates thin quotes at
+3,4,5,6,8,9,10,14,21,29d so `--mock` exercises this meaningfully.
+
+**3. "Order rates should be submitted as hourly, not daily -- did you know
+that?"** Researched before changing anything, since silently complying with
+an incorrect unit claim would have introduced a severe live-trading pricing
+bug. Three independent, converging sources confirm the `rate` field in a
+Bitfinex funding-offer submission is a **daily** rate, not hourly: (a)
+Bitfinex's own funding interest formula is `amount * rate% * (seconds_lent /
+seconds_in_a_day) * (1 - fee%)`, explicitly a per-day basis; (b) Bitfinex's
+own worked example states "2 BTC at 0.04% = 0.0008 BTC/day"; (c) a real
+API response with `rate='0.0002'` at a 7-day period annualizes
+(`rate * 365`) to a realistic ~7.3% APR -- annualizing it as if hourly
+(`rate * 24 * 365`) would imply a nonsensical ~175% APR. **No code change**
+-- this codebase already treats `rate` as daily throughout (see `net_apr()`
+in `config.py`, `TENOR_TYPICAL_ORDER_SIZE`-based tranche rates in
+`strategy.py`). The likely source of the user's confusion: Bitfinex's Flash
+Return Rate (FRR) *updates* hourly (a different, real fact) -- but FRR's
+update cadence and an individual offer's own rate time-unit are unrelated
+facts about the same market.
+
+**4. "Research whether Bitfinex has a minimum order size, and enforce it."**
+Re-verified: Bitfinex's documented minimum funding-offer size is **$150
+USD** (Bitfinex Help Center), matching `constants.BFX_MIN_ORDER_USD`, already
+enforced where tranches are constructed (`build_tranches_for_tenor`'s
+`fixed_count` branch now explicitly floors the tranche count against it, and
+`runner.run_cycle` already skipped any tenor bucket below it before this
+change).
+
 ## v5.1 (real backtest of the spike signal and term-premium persistence -- `enable_spike_reserve` now defaults False)
 
 The user asked for the FBRR-style prediction question to actually be

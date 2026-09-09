@@ -1,11 +1,25 @@
 from tsgex_bfx_bot.mock_client import MockBitfinexClient
 
 
-def test_funding_book_only_contains_target_and_extreme_tenors():
+def test_funding_book_includes_core_and_thin_periods():
+    """v5.2: the mock book now also quotes a spread of thinly-traded periods
+    (3-29d, excluding 7/30) so --mock can exercise the generalized N-tenor
+    allocation and depth filter, alongside the core liquid periods."""
     client = MockBitfinexClient()
     book = client.get_funding_book("fUSD")
     periods = {row[1] for row in book}
-    assert periods == {2, 7, 30, 120}
+    assert {2, 7, 30, 120}.issubset(periods)
+    assert set(MockBitfinexClient.THIN_PERIODS).issubset(periods)
+
+
+def test_thin_periods_have_less_depth_than_core_2d_liquidity():
+    client = MockBitfinexClient()
+    book = client.get_funding_book("fUSD")
+    depth = {}
+    for rate, period, _, amount in book:
+        depth[period] = depth.get(period, 0.0) + abs(amount)
+    for t in MockBitfinexClient.THIN_PERIODS:
+        assert depth[t] < depth[2]  # mirrors real liquidity concentration at 2d
 
 
 def test_funding_book_2d_liquidity_dominates_by_row_count():

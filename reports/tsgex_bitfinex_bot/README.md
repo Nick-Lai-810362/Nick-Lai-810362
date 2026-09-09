@@ -33,21 +33,23 @@ Run the test suite with `pytest` from this directory (or anywhere, since
 tsgex_bitfinex_lending_bot.py   Thin CLI entry point (configures logging, calls cli.main())
 
 tsgex_bfx_bot/
-  constants.py     Real-data-derived numbers: target tenors, per-tenor typical
-                    order size, max-wait heuristics, platform fees. Every
-                    value's source is documented inline.
+  constants.py     Real-data-derived numbers: reference tenors, per-tenor
+                    typical order size, max-wait heuristics, platform fees.
+                    Every value's source is documented inline.
   config.py        StrategyConfig dataclass + platform_fee()/net_apr()
   ledger.py        Position/BotState, the principal-vs-profit ledger:
                     load/save, contribute, reconcile (matured + pending),
                     open/cancel a position, CSV export
   client.py        BitfinexClient (real REST calls) + extract_offer_id()
   mock_client.py   MockBitfinexClient: synthetic book shaped like real
-                    liquidity, plus a simulated pending-offer fill lifecycle
+                    liquidity (core 2/7/30/120d periods plus a spread of thin
+                    3-29d periods), plus a simulated pending-offer fill lifecycle
   governance.py    assert_minimal_permissions() -- refuses to run --live if
                     the API key can withdraw/transfer
   audit.py         write_audit_log() -- JSON-lines decision trail
-  strategy.py      best_rate_by_tenor(), decide_tenor_allocation(),
-                    compute_spike_signal(), build_tranches_for_tenor()
+  strategy.py      best_rate_by_tenor(), depth_by_tenor(),
+                    decide_tenor_allocation(), compute_spike_signal(),
+                    build_tranches_for_tenor()
   execution.py     place_tranche(), place_frr_tranche(),
                     reconcile_pending_offers() (fill detection + stale
                     cancel+relist)
@@ -64,8 +66,12 @@ tests/             pytest suite, one file per module + test_integration.py
 
 1. Settle any matured (filled + tenor elapsed) positions -> principal back
    to idle, interest realized as profit.
-2. Read the live funding book, compute the best rate at each real liquid
-   tenor (2/7/30 days; 120d only if `--authorize-extreme-tenor`).
+2. Read the live funding book, compute the best rate AND total quoted depth
+   at every period actually quoted right now (not a fixed 2/7/30 shortlist --
+   Bitfinex accepts any period 2-120 days). A period beyond 30 days is only
+   considered with `--authorize-extreme-tenor`; any period is skipped if its
+   book depth is below `--min-period-depth-usd` (a rate quoted by one thin
+   order isn't reliably fillable at tranche scale).
 3. Reconcile pending (submitted, not yet filled) positions against the
    exchange's real open-offers list: no longer listed = filled; still open
    but stale (waited too long, or the market rate has drifted from the
@@ -74,6 +80,11 @@ tests/             pytest suite, one file per module + test_integration.py
    hold.
 5. Dispatch on `--mode` (`dave_high` / `dave_fast` / `custom` / `frr` /
    `barbell`) to decide how much to place at which tenor(s), and place it.
+   Within each tenor bucket, tranches are sized by `--tranche-sizing-mode`:
+   `calibrated` (default) derives tranche count from that tenor's real
+   observed trade size; `fixed_count` instead splits the bucket's capital
+   evenly across `--max-concurrent-orders` tranches, for direct control over
+   how many concurrent orders are outstanding.
 6. Write a structured audit-log record and persist the ledger.
 
 ## Safety

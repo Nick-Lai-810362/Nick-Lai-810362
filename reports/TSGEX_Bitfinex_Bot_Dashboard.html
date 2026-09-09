@@ -122,6 +122,8 @@ tbody tr:hover { background: var(--page-plane); }
 .status-pill { font-size: 11px; padding: 1px 8px; border-radius: 999px; font-weight: 600; }
 .status-active { background: color-mix(in srgb, var(--series-1) 18%, transparent); color: var(--series-1); }
 .status-matured { background: color-mix(in srgb, var(--success-text) 16%, transparent); color: var(--success-text); }
+.status-pending { background: color-mix(in srgb, var(--series-4) 20%, transparent); color: var(--series-4); }
+.status-cancelled { background: color-mix(in srgb, var(--text-muted) 20%, transparent); color: var(--text-muted); }
 .table-scroll { max-height: 420px; overflow: auto; border: 1px solid var(--border); border-radius: 8px; }
 .row-count { font-size: 12px; color: var(--text-muted); margin-top: 8px; }
 
@@ -147,6 +149,7 @@ tbody tr:hover { background: var(--page-plane); }
     <div class="panel">
       <h2>總覽</h2>
       <div class="cards" id="summaryCards"></div>
+      <div class="hint" style="margin-top:10px;">等待成交中的部位金額已從本金/利潤池扣除（下單當下即視為已投入），但尚未開始計息</div>
     </div>
 
     <div class="panel">
@@ -160,8 +163,10 @@ tbody tr:hover { background: var(--page-plane); }
           <label for="fStatus">狀態</label>
           <select id="fStatus">
             <option value="all">全部</option>
+            <option value="pending">等待成交中</option>
             <option value="active">使用中</option>
             <option value="matured">已到期</option>
+            <option value="cancelled">已撤銷重掛</option>
           </select>
         </div>
         <div class="filter-field">
@@ -197,7 +202,7 @@ tbody tr:hover { background: var(--page-plane); }
           <thead>
             <tr>
               <th>狀態</th><th>天期</th><th>金額</th><th>本金部分</th><th>利潤部分</th>
-              <th>毛年化</th><th>淨年化</th><th>下單時間</th><th>到期時間</th><th>已實現利潤</th>
+              <th>毛年化</th><th>淨年化</th><th>下單時間</th><th>成交時間</th><th>到期時間</th><th>已實現利潤</th>
             </tr>
           </thead>
           <tbody id="tableBody"></tbody>
@@ -242,6 +247,8 @@ tbody tr:hover { background: var(--page-plane); }
     return rows;
   }
 
+  const STATUS_LABEL = {pending: '等待成交中', active: '使用中', matured: '已到期', cancelled: '已撤銷重掛'};
+
   function fmtUSD(n) { return '$' + n.toLocaleString('en-US', {maximumFractionDigits: 0}); }
   function fmtPct(n) { return (n*100).toFixed(2) + '%'; }
   function fmtDate(iso) { if (!iso) return ''; return iso.slice(0,10) + ' ' + iso.slice(11,16); }
@@ -284,17 +291,22 @@ tbody tr:hover { background: var(--page-plane); }
 
   function renderSummary(rows) {
     const active = rows.filter(r => r.status === 'active');
+    const pending = rows.filter(r => r.status === 'pending');
     const matured = rows.filter(r => r.status === 'matured');
+    const cancelled = rows.filter(r => r.status === 'cancelled');
     const activeAmount = active.reduce((s,r) => s+r.amount, 0);
     const activePrincipal = active.reduce((s,r) => s+r.principal_component, 0);
     const activeProfit = active.reduce((s,r) => s+r.profit_component, 0);
+    const pendingAmount = pending.reduce((s,r) => s+r.amount, 0);
     const realizedProfit = matured.reduce((s,r) => s+(r.interest_earned||0), 0);
     const el = document.getElementById('summaryCards');
     el.innerHTML = [
       ['使用中部位金額', fmtUSD(activeAmount), ''],
       ['使用中本金', fmtUSD(activePrincipal), ''],
       ['使用中利潤（含複投）', fmtUSD(activeProfit), 'profit'],
+      ['等待成交中金額', fmtUSD(pendingAmount), ''],
       ['篩選範圍已實現利潤', fmtUSD(realizedProfit), 'profit'],
+      ['已撤銷重掛次數', cancelled.length.toLocaleString(), ''],
       ['部位數（篩選後）', rows.length.toLocaleString(), ''],
     ].map(([label, value, cls]) => `
       <div class="card"><div class="label">${label}</div><div class="value ${cls}">${value}</div></div>
@@ -307,7 +319,7 @@ tbody tr:hover { background: var(--page-plane); }
     const shown = sorted.slice(0, 500);
     body.innerHTML = shown.map(r => `
       <tr>
-        <td><span class="status-pill status-${r.status}">${r.status === 'active' ? '使用中' : '已到期'}</span></td>
+        <td><span class="status-pill status-${r.status}">${STATUS_LABEL[r.status] || r.status}</span></td>
         <td>${r.tenor_days}d</td>
         <td>${fmtUSD(r.amount)}</td>
         <td>${fmtUSD(r.principal_component)}</td>
@@ -315,7 +327,8 @@ tbody tr:hover { background: var(--page-plane); }
         <td>${fmtPct(r.gross_apr)}</td>
         <td>${fmtPct(r.net_apr)}</td>
         <td>${fmtDate(r.placed_ts)}</td>
-        <td>${fmtDate(r.maturity_ts)}</td>
+        <td>${fmtDate(r.filled_ts) || '—'}</td>
+        <td>${fmtDate(r.maturity_ts) || '—'}</td>
         <td>${r.interest_earned !== null ? fmtUSD(r.interest_earned) : '—'}</td>
       </tr>
     `).join('');
@@ -410,11 +423,12 @@ tbody tr:hover { background: var(--page-plane); }
 
   function rowsToCSV(rows) {
     const header = ['id','status','label','tenor_days','amount','principal_component','profit_component',
-      'daily_rate','gross_apr','net_apr','placed_ts','maturity_ts','matured_ts','interest_earned'];
+      'daily_rate','gross_apr','net_apr','placed_ts','filled_ts','maturity_ts','matured_ts','interest_earned'];
     const lines = [header.join(',')];
     rows.forEach(r => {
       lines.push([r.id, r.status, r.label, r.tenor_days, r.amount, r.principal_component, r.profit_component,
-        r.daily_rate, r.gross_apr, r.net_apr, r.placed_ts, r.maturity_ts, r.matured_ts||'', r.interest_earned ?? ''].join(','));
+        r.daily_rate, r.gross_apr, r.net_apr, r.placed_ts, r.filled_ts||'', r.maturity_ts||'', r.matured_ts||'',
+        r.interest_earned ?? ''].join(','));
     });
     return lines.join('\n');
   }

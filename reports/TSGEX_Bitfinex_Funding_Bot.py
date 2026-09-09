@@ -1,115 +1,103 @@
 #!/usr/bin/env python3
 """
-TSGEX Bitfinex USD Margin Funding Automation Bot (v4 -- real-data-grounded tenor logic + P&L ledger)
-========================================================================================================
+TSGEX Bitfinex USD Margin Funding Automation Bot (v5 -- pending/fill tracking + stale-order cancel-relist)
+==============================================================================================================
 
-WHAT CHANGED IN v4 AND WHY
+WHAT CHANGED IN v5 AND WHY
 -----------------------------
-v3 chose tenor via a STATIC 3-bracket ladder (net APR <15% -> 2-7d, 15-30% ->
-15-30d, >=30% -> 60-120d) borrowed from the TSGEX report's own governance
-policy. The user asked to actually research how Bitfinex's real rate/tenor
-structure works and rebuild this on real data instead of an assumed table.
-That research used the real fUSD data the user collected earlier in this
-project (TSGEX_Bitfinex_Funding_History_Collector.py output: 5 years of
-hourly p2/p30/p120 rate candles, plus a ~10,000-row recent trades sample)
-and Bitfinex's own public documentation. Findings, and what changed as a
-result:
+Two follow-up questions from the user drove this revision:
 
-  1. REAL LIQUIDITY IS OVERWHELMINGLY CONCENTRATED AT THE 2-DAY TENOR.
-     In the real recent-trades sample, period=2 accounted for 89.6% of all
-     matched trade COUNT and 96%+ of matched USD VOLUME; period=30 was
-     ~1.0% of trades, period=120 just 0.11%. Bitfinex's own docs confirm:
-     "the most common periods are 2, 7, or 30 days." -> v4 targets exactly
-     these three tenors (TARGET_TENORS = (2, 7, 30)) instead of an
-     arbitrary continuous ladder. 120d is EXCLUDED by default (see #2).
+  6. PENDING VS FILLED, AND CANCEL+RELIST STALE ORDERS.
+     Every prior version treated a submitted order as INSTANTLY earning
+     interest from the moment it was placed. That's wrong: a real Bitfinex
+     funding offer sits UNFILLED in the book until a borrower actually takes
+     it (in whole or in part -- see v4 finding #4), which can take anywhere
+     from seconds to... indefinitely, if the quoted rate isn't competitive.
+     v5 splits the position lifecycle into pending -> active -> matured (or
+     pending -> cancelled). A pending order is reconciled every cycle
+     against the exchange's real open-offers list (client.get_active_
+     funding_offers -- if the order is no longer there, it filled; the
+     public API doesn't expose per-offer partial-fill amounts, so
+     "disappeared from open offers" is the correct, and only available,
+     fill signal). Two triggers cancel a still-pending order and
+     IMMEDIATELY resubmit at the current rate (reconcile_pending_offers()):
+       a. Waited too long: elapsed time since submission >=
+          --max-wait-multiplier x a per-tenor default (DEFAULT_MAX_WAIT_HOURS
+          = {2h:6, 7d:24, 30d:72, 120d:120}). These defaults are a DISCLOSED
+          HEURISTIC, not measured data -- Bitfinex's REST API has no
+          historical order-book endpoint, so actual fill-latency can't be
+          measured retroactively the way the rate/tenor data could. They're
+          set roughly proportional to tenor length and inversely to that
+          bucket's real matching liquidity (2d/7d/30d volume shares of
+          89.6%/4.5%/1.0% -- see v4 finding #1), i.e. a thinner market gets
+          more patience before being called "stuck." Tune via
+          --max-wait-multiplier once you have real fill-latency data from
+          your own account's order history.
+       b. Rate drifted: the live net-APR at that position's tenor has moved
+          away from its own quoted rate by >= --rate-drift-threshold-pp
+          (default 1 percentage point) in EITHER direction -- if the market
+          moved up, the stale order is now underpriced (leaving return on
+          the table); if the market moved down, the stale order was
+          probably too aggressive to begin with (which is likely WHY it
+          hasn't filled) and should be repriced to the current competitive
+          rate to actually get matched.
+     Pending capital is deducted from the idle pool at SUBMISSION time (not
+     fill time) since that's when it's actually committed/locked in the
+     funding wallet, matching real account behavior.
+     Live-mode caveat: the exact response shape of Bitfinex's authenticated
+     write endpoints (needed to extract the new offer's ID for later
+     cancellation) has NOT been verified against a real API call in this
+     sandbox (outbound network access to Bitfinex is blocked here -- see
+     the collector script's docs for the same limitation). extract_offer_id()
+     tries the documented notification-envelope shape defensively; if it's
+     wrong, that specific position's offer_id stays None and it falls back
+     to maturity-only tracking (safe, just not stale-cancellable) until you
+     verify the real shape against your own key and adjust if needed.
 
-  2. 120-DAY TENOR MEASURED NO RATE PREMIUM OVER 30-DAY, IN 5 YEARS OF DATA.
-     Time-aligned join of the real p2/p30/p120 candles (25,354 overlapping
-     hourly rows, 2021-08 to 2026-09): median spread (p120 - p30) = +0.04
-     percentage points, and was positive only 55.4% of the time --
-     statistically indistinguishable from zero. Meanwhile p120 has ~8x LESS
-     matched volume than the already-thin p30 market. 120d is therefore
-     strictly dominated by 30d in this data: same reward, far worse
-     liquidity, 4x longer lock-up. v4 drops 120d from the default target
-     set; it remains available only via --authorize-extreme-tenor for a
-     deliberate large block trade, same governance-gate spirit as before.
+  7. TRANCHE SIZE RECALIBRATED FROM MEDIAN TO P75 REAL TRADE SIZE.
+     User asked directly: given no order-count limit exists and partial
+     fills are supported, wouldn't ONE giant order be better? Answer: no --
+     a single order commits 100% of that capital to one rate guess (either
+     a large enough counterparty appears soon, which the real data shows is
+     rare -- only one $1.18M trade in the ~10,000-row recent sample, vs a
+     $500 median -- or it sits earning nothing while it waits), whereas the
+     inverted-pyramid ladder diversifies EXECUTION/rate risk the same way
+     it always did; that logic doesn't depend on any order-count ceiling.
+     But going the other way -- v4's default of the per-tenor MEDIAN real
+     trade size ($700/2d, 227 tranches on a NT$5M/~USD158,730 position) --
+     is also not obviously optimal now that pending orders need per-cycle
+     monitoring and can trigger cancel+relist churn: more, smaller tranches
+     mean more entities to track, more chances to hit a stale-order cancel,
+     and (in --live) more submitted/cancelled API calls. v5 moves the
+     default to each tenor's P75 real trade size instead ($825/2d, $574/7d,
+     $491/30d -- still comfortably below the thin P90/P99 tail, so fill
+     probability isn't meaningfully worse than the median target), cutting
+     the NT$5M/2d-bucket case from 227 tranches to ~192 -- a modest,
+     defensible reduction in operational overhead without reintroducing the
+     "too few, too large" problem the v4 calibration fixed in the first
+     place. See TENOR_TYPICAL_ORDER_SIZE.
 
-  3. THE 2-DAY -> 30-DAY TERM PREMIUM IS REAL BUT NOT CONSTANT.
-     Over the full 5-year history, median (p30 - p2) spread = +3.65
-     percentage points of APR (positive 85.5% of the time -- a genuine,
-     persistent premium for locking up capital longer). BUT a same-day
-     snapshot from the live trades sample the user pulled on 2026-09-07
-     showed a much flatter curve (2d median 7.34% APR vs 30d 8.12% --
-     only +0.78pp). The premium clearly varies by regime (it's also larger
-     when short rates are themselves low: +4.30pp in the below-median-rate
-     regime vs +2.52pp in the above-median-rate regime). CONCLUSION: a
-     fixed lookup table ("4-7% APR -> 2 days, 7-11% -> 3 days" etc., which
-     is what was originally asked for) would be WRONG, because the
-     relationship it would encode is not stable over time. v4 instead
-     reads the ACTUAL currently-available rate at each of the 2/7/30-day
-     buckets from the live funding book every cycle, computes the CURRENT
-     premium, and only allocates capital to a longer tenor when that
-     LIVE premium clears a configurable minimum (TERM_PREMIUM_MIN_PP,
-     default 2.0 percentage points net-of-fee APR -- chosen conservatively
-     inside the observed 0.78pp-to-3.65pp range so the bot doesn't lock up
-     capital for a premium that may already have evaporated by the time the
-     book is read). This replaces select_tenor() and the old static ladder
-     entirely; see decide_tenor_allocation().
-
-  4. ORDER SIZE VS TURNOVER: NO PUBLISHED MAX-CONCURRENT-OFFER-COUNT LIMIT
-     EXISTS. Searched Bitfinex's own docs (docs.bitfinex.com/docs/
-     requirements-and-limitations, the funding offer submit/cancel API
-     reference, and margin-funding help-center articles) specifically for
-     this. What IS documented: (a) a REQUEST RATE limit of 10-90 req/min
-     depending on endpoint (an IP that exceeds it is blocked for 60s) --
-     this constrains how FAST you can submit many orders, not how many you
-     can hold open; (b) funding offers DO support partial fills -- a single
-     large offer can fill incrementally across many different borrowers
-     over time rather than requiring one counterparty for the whole amount;
-     (c) matching is rate-priority + duration-compatible (an offer's period
-     must be >= a bid's requested period). So "harder to lend out" for a
-     large single order is real, but it's a LIQUIDITY/matching-speed effect,
-     not a hard order-count ceiling. v4 sizes each tranche against the
-     REAL observed trade-size distribution for that specific tenor bucket
-     (from the same trades sample: period=2 median trade $500, p90 $4,718;
-     period=7 median $343, p90 $1,082; period=30 median $183, p90 $2,231 --
-     see TENOR_TYPICAL_ORDER_SIZE, dated and disclosed as a point-in-time
-     read, not a permanent constant) instead of one generic $150-1,000
-     range applied to every tenor. Submission pacing (SUBMIT_PACING_SEC)
-     is added between live order submissions to respect the documented
-     request-rate limit, since that -- not order count -- is the real
-     documented constraint.
-
-  5. PRINCIPAL VS PROFIT LEDGER (closes the state-tracking gap flagged in
-     the v3 spec review). v3 recomputed "how much is available to lend"
-     fresh from total capital every cycle, with no memory of what was
-     already placed in prior cycles -- fine for a dry-run demo, wrong for
-     continuous live operation (would try to re-lend the same capital
-     every cycle). v4 adds a persistent JSON ledger (--state-file,
-     default bfx_bot_state.json): every dollar is tagged as PRINCIPAL
-     (what you originally contributed) or PROFIT (interest realized, and
-     interest realized on capital that itself already contained
-     reinvested profit -- the tag propagates forward through re-lending,
-     so compounded profit-on-profit is still counted as profit, never
-     silently reclassified as principal). See BotState / Position /
-     reconcile_matured_positions() / open_position().
+WHAT v4 CHANGED (kept from the prior revision; see git history for the full
+detailed writeup): real-data-grounded TARGET_TENORS=(2,7,30) replacing a
+static ladder, decide_tenor_allocation() reading the LIVE book every cycle
+instead of a fixed lookup table, the principal/profit ledger (BotState/
+Position) with the tag propagating through re-lending, --export-csv.
 
 WHAT IS STILL NOT REPRODUCED
 -------------------------------
-Same as v3: Fuly's actual FBRR forecasting MODEL is undisclosed and not
-reproduced (only the documented reserve-capital BEHAVIOR is approximated,
-via the same disclosed spike-proxy heuristic as before). The empirical
-numbers above are a real but NECESSARILY time-bound read of the market
-(collected 2026-09; both the term premium and the typical order sizes will
-drift) -- they are disclosed, dated inputs you can and should refresh by
-re-running TSGEX_Bitfinex_Funding_History_Collector.py periodically, not
-permanent constants.
+Fuly's actual FBRR forecasting MODEL remains undisclosed and unreproduced
+(only the documented reserve-capital BEHAVIOR is approximated, via the same
+disclosed spike-proxy heuristic as before). All empirical numbers above are
+dated point-in-time reads of the market (2026-09) -- refresh periodically
+via TSGEX_Bitfinex_Funding_History_Collector.py, don't treat as permanent.
 
 SAFETY DEFAULTS (unchanged)
 ------------------------------
 - dry-run by default; --live requires real credentials via env vars
 - refuses to run live if the API key has withdrawal/transfer scope
-- --mock mode: synthetic funding book, zero network access/credentials
+- --mock mode: synthetic funding book AND a simulated pending-offer/fill
+  lifecycle (per-tenor fill probability each cycle), so the new cancel+
+  relist logic can be exercised meaningfully with zero network access
 
 SETTING UP A REAL API KEY
 ---------------------------
@@ -129,12 +117,12 @@ SETTING UP A REAL API KEY
 USAGE EXAMPLES
 --------------
   # First-time setup: contribute principal, then run a demo with the clock
-  # fast-forwarded so positions actually mature within a short test
-  python tsgex_bitfinex_lending_bot.py --mock --contribute 160000 --mode dave_high \\
+  # fast-forwarded so positions actually fill/mature within a short test
+  python tsgex_bitfinex_lending_bot.py --mock --contribute 158730 --mode dave_high \\
       --cycles 10 --mock-days-per-cycle 3
 
   # Real dry-run against live market data (places no orders), needs network
-  python tsgex_bitfinex_lending_bot.py --contribute 160000 --mode barbell
+  python tsgex_bitfinex_lending_bot.py --contribute 158730 --mode barbell
 
   # Export the full position history (principal/profit split) to CSV
   python tsgex_bitfinex_lending_bot.py --export-csv history.csv --export-tenor 30 \\
@@ -149,6 +137,7 @@ SOURCES
     2026-09-07: funding_candles_fUSD_p2/p30/p120.csv, funding_trades_fUSD.csv)
   https://docs.bitfinex.com/docs/requirements-and-limitations
   https://docs.bitfinex.com/reference/rest-auth-submit-funding-offer
+  https://docs.bitfinex.com/reference/rest-auth-funding-offers
   https://support.bitfinex.com/hc/en-us/articles/213918949-What-is-the-minimum-offer-for-Funding
   https://support.bitfinex.com/hc/en-us/articles/214441185-What-is-Margin-Funding
   https://medium.com/@altinvestbot/how-bitfinex-matches-lending-funds-behind-the-scenes-of-the-p2p-funding-market-531e081fc34b
@@ -177,17 +166,21 @@ BFX_API_URL = "https://api.bitfinex.com"
 BFX_MIN_ORDER_USD = 150.0
 
 # Real, liquid tenor buckets per Bitfinex's own documentation and the real
-# trade-size/volume evidence above. 120d deliberately excluded by default.
+# trade-size/volume evidence (see v4 docstring history). 120d excluded by default.
 TARGET_TENORS = (2, 7, 30)
 EXTREME_TENOR = 120
 
 # Point-in-time (2026-09-07) empirical per-tenor typical order size, from the
-# real fUSD trades sample: roughly halfway between the median and P90 trade
-# size for that tenor bucket. Disclosed as dated evidence, not a constant --
-# refresh by re-analyzing a fresh pull from the collector script.
-TENOR_TYPICAL_ORDER_SIZE = {2: 700.0, 7: 500.0, 30: 300.0, EXTREME_TENOR: 300.0}
+# real fUSD trades sample: the P75 trade size for that tenor bucket (see v5
+# finding #7 for why P75 rather than median). Disclosed as dated evidence,
+# not a constant -- refresh by re-analyzing a fresh pull from the collector.
+TENOR_TYPICAL_ORDER_SIZE = {2: 825.0, 7: 574.0, 30: 491.0, EXTREME_TENOR: 491.0}
 
 SUBMIT_PACING_SEC = 1.0  # live-mode only; 1/sec = 60/min, safely inside Bitfinex's documented 10-90/min
+
+# Disclosed heuristic (NOT measured -- see v5 finding #6), hours before a
+# still-unfilled pending order is considered stale and cancelled+relisted.
+DEFAULT_MAX_WAIT_HOURS = {2: 6.0, 7: 24.0, 30: 72.0, EXTREME_TENOR: 120.0}
 
 
 # ---------------------------------------------------------------------------
@@ -205,26 +198,22 @@ class StrategyConfig:
     floor_rate: float = 0.05          # net-of-fee APR floor; below this, hold and place nothing
     reserved_amount: float = 0.0      # capital always kept unlent
 
-    # Live-book-driven tenor allocation (replaces v3's static ladder)
-    term_premium_min_pp: float = 0.02   # 2.0 percentage points net APR; see docstring #3 for why
-    authorize_extreme_tenor: bool = False  # gate for the 120d bucket (never used unless explicitly set)
-    barbell_short_fraction: float = 0.5    # --mode barbell only: split between the 2d and 30d buckets
+    term_premium_min_pp: float = 0.02
+    authorize_extreme_tenor: bool = False
+    barbell_short_fraction: float = 0.5
 
     # Safety bound on tranche count, NOT a Bitfinex-imposed limit (none is
-    # published -- see docstring #4). Exists only so a truly extreme capital
-    # amount can't generate an unbounded number of orders in one cycle. Set
-    # high enough that a NT$5,000,000-scale account (~USD 158,730) placing
-    # 100% into the 2-day bucket (227 tranches at the real $700 typical
-    # order size) is NOT truncated -- a lower default here would silently
-    # override the per-tenor calibration and defeat the point of it (this
-    # was in fact a real bug in the previous default of 30, caught by
-    # checking this exact NT$5M scenario: it collapsed 227 calibrated
-    # tranches into 30 oversized ones, averaging $5,291/tranche -- above
-    # even the 90th-percentile real 2-day trade size).
+    # published). High enough that a NT$5,000,000-scale account (~USD
+    # 158,730) at the P75 calibration (~192 tranches @2d) is not truncated.
     max_orders_per_cycle: int = 400
     tranche_rate_step_apr: float = 0.01
     tranche_weight_base: float = 0.8
     tranche_weight_step: float = 0.2
+
+    # Stale pending-order cancel+relist (v5 finding #6)
+    max_wait_hours: dict = field(default_factory=lambda: dict(DEFAULT_MAX_WAIT_HOURS))
+    max_wait_multiplier: float = 1.0
+    rate_drift_threshold_pp: float = 0.01
 
     # FBRR / Dave-High reserve behavior: disclosed proxy signal, not Fuly's real model
     spike_fast_window: int = 6
@@ -256,6 +245,11 @@ def write_audit_log(cfg: "StrategyConfig", record: dict):
 # Principal / profit ledger -- persistent across runs. Every dollar is
 # tagged principal or profit; the tag propagates forward through re-lending
 # so compounded profit-on-profit is still counted as profit.
+#
+# Position lifecycle: pending (submitted, capital committed, not yet
+# earning) -> active (filled, tenor clock running) -> matured (settled) --
+# or pending -> cancelled (stale order pulled, capital returned, zero
+# interest, see reconcile_pending_offers()).
 # ---------------------------------------------------------------------------
 @dataclass
 class Position:
@@ -266,8 +260,10 @@ class Position:
     daily_rate: float
     tenor_days: int
     placed_ts: str
-    maturity_ts: str
-    status: str = "active"  # "active" | "matured"
+    offer_id: Optional[str] = None
+    filled_ts: Optional[str] = None
+    maturity_ts: Optional[str] = None
+    status: str = "pending"  # "pending" | "active" | "matured" | "cancelled"
     matured_ts: Optional[str] = None
     interest_earned: Optional[float] = None
     label: str = ""
@@ -279,7 +275,7 @@ class BotState:
     idle_principal: float = 0.0
     idle_profit: float = 0.0
     realized_profit_total: float = 0.0
-    positions: list = field(default_factory=list)  # list[Position], active + matured history
+    positions: list = field(default_factory=list)  # list[Position], full history
 
 
 def load_state(path: str) -> BotState:
@@ -292,9 +288,8 @@ def load_state(path: str) -> BotState:
 
 
 def save_state(state: BotState, path: str):
-    raw = asdict(state)
     with open(path, "w") as f:
-        json.dump(raw, f, ensure_ascii=False, indent=2)
+        json.dump(asdict(state), f, ensure_ascii=False, indent=2)
 
 
 def contribute_principal(state: BotState, amount: float):
@@ -303,12 +298,12 @@ def contribute_principal(state: BotState, amount: float):
 
 
 def reconcile_matured_positions(state: BotState, now: datetime) -> list:
-    """Settles any position whose tenor has elapsed: principal returns to
-    idle_principal unchanged, interest earned is added to idle_profit AND
-    realized_profit_total. Returns the list of positions just matured."""
+    """Settles any ACTIVE (filled) position whose tenor has elapsed:
+    principal returns to idle_principal unchanged, interest earned is added
+    to idle_profit AND realized_profit_total."""
     just_matured = []
     for p in state.positions:
-        if p.status != "active":
+        if p.status != "active" or p.maturity_ts is None:
             continue
         if datetime.fromisoformat(p.maturity_ts) > now:
             continue
@@ -328,10 +323,10 @@ def available_balance(state: BotState) -> float:
 
 
 def open_position(state: BotState, amount: float, daily_rate: float, tenor_days: int,
-                   now: datetime, label: str = "") -> Position:
-    """Draws `amount` proportionally from the idle principal/profit pools
-    (so the new position's own principal/profit tags reflect what actually
-    funded it), moves it into a new active Position, and returns it."""
+                   now: datetime, label: str = "", offer_id=None) -> Position:
+    """Draws `amount` proportionally from the idle principal/profit pools at
+    SUBMISSION time (capital is committed the moment an offer is placed,
+    even before it's matched) and creates a new PENDING position."""
     total_idle = state.idle_principal + state.idle_profit
     principal_frac = (state.idle_principal / total_idle) if total_idle > 1e-9 else 1.0
     principal_component = amount * principal_frac
@@ -339,15 +334,30 @@ def open_position(state: BotState, amount: float, daily_rate: float, tenor_days:
     state.idle_principal = max(0.0, state.idle_principal - principal_component)
     state.idle_profit = max(0.0, state.idle_profit - profit_component)
 
-    placed = now
-    maturity = now + timedelta(days=tenor_days)
     pos = Position(
         id=str(uuid.uuid4())[:8], amount=amount, principal_component=principal_component,
         profit_component=profit_component, daily_rate=daily_rate, tenor_days=tenor_days,
-        placed_ts=placed.isoformat(), maturity_ts=maturity.isoformat(), status="active", label=label,
+        placed_ts=now.isoformat(), offer_id=str(offer_id) if offer_id is not None else None,
+        status="pending", label=label,
     )
     state.positions.append(pos)
     return pos
+
+
+def mark_filled(position: Position, now: datetime):
+    position.status = "active"
+    position.filled_ts = now.isoformat()
+    position.maturity_ts = (now + timedelta(days=position.tenor_days)).isoformat()
+
+
+def cancel_position(state: BotState, position: Position, now: datetime):
+    """Stale/unfilled order pulled: capital returns to the idle pools
+    unchanged (zero interest -- it never earned anything)."""
+    state.idle_principal += position.principal_component
+    state.idle_profit += position.profit_component
+    position.status = "cancelled"
+    position.matured_ts = now.isoformat()
+    position.interest_earned = 0.0
 
 
 def export_positions_csv(state: BotState, path: str, tenor_filter: Optional[int] = None,
@@ -365,14 +375,15 @@ def export_positions_csv(state: BotState, path: str, tenor_filter: Optional[int]
     with open(path, "w", newline="") as f:
         w = csv.writer(f)
         w.writerow(["id", "status", "label", "tenor_days", "amount", "principal_component",
-                    "profit_component", "daily_rate", "gross_apr", "net_apr", "placed_ts",
+                    "profit_component", "daily_rate", "gross_apr", "net_apr", "placed_ts", "filled_ts",
                     "maturity_ts", "matured_ts", "interest_earned"])
         for p in rows:
             gross = p.daily_rate * 365
             w.writerow([p.id, p.status, p.label, p.tenor_days, f"{p.amount:.2f}",
                         f"{p.principal_component:.2f}", f"{p.profit_component:.2f}", p.daily_rate,
-                        f"{gross:.4f}", f"{gross*(1-0.15):.4f}", p.placed_ts, p.maturity_ts,
-                        p.matured_ts or "", f"{p.interest_earned:.2f}" if p.interest_earned is not None else ""])
+                        f"{gross:.4f}", f"{gross*0.85:.4f}", p.placed_ts, p.filled_ts or "",
+                        p.maturity_ts or "", p.matured_ts or "",
+                        f"{p.interest_earned:.2f}" if p.interest_earned is not None else ""])
     return len(rows)
 
 
@@ -423,32 +434,57 @@ class BitfinexClient:
     def submit_frr_offer(self, symbol: str, amount: float, period_days: int):
         return self.submit_funding_offer(symbol, amount, 0, period_days)
 
-    def cancel_funding_offer(self, offer_id: int):
+    def cancel_funding_offer(self, offer_id):
         return self._signed_post("auth/w/funding/offer/cancel", {"id": offer_id})
+
+
+def extract_offer_id(resp):
+    """Best-effort extraction of a new offer's ID from a submit response.
+    Mock client returns the raw offer list ([ID, ...]) directly. Real
+    Bitfinex wraps write-endpoint responses in a notification envelope
+    ([MTS, TYPE, MESSAGE_ID, null, [offer_data...], CODE, STATUS, TEXT]) per
+    its documented convention -- offer_data[0] is the ID. NOT verified
+    against a live call in this sandbox (network egress to Bitfinex is
+    blocked here); if the real shape differs, this returns None and that
+    position's offer_id stays unset (safe fallback: maturity-only tracking,
+    just not stale-cancellable) -- verify against your own key before
+    relying on this for live cancel+relist."""
+    try:
+        if isinstance(resp, list) and len(resp) > 0:
+            if not isinstance(resp[0], list):
+                return resp[0]  # mock: raw offer list, ID first
+            if len(resp) >= 5 and isinstance(resp[4], list) and len(resp[4]) > 0:
+                return resp[4][0]  # live: notification envelope
+    except Exception:
+        pass
+    return None
 
 
 # ---------------------------------------------------------------------------
 # Mock client -- synthetic funding book shaped to match the REAL observed
-# liquidity concentration (mostly 2d, some 7d, thin 30d) and a term premium
-# that varies cycle to cycle so both branches of decide_tenor_allocation get
-# exercised in a demo run.
+# liquidity concentration, PLUS a simulated pending-offer fill lifecycle so
+# --mock can meaningfully exercise reconcile_pending_offers(): each cycle,
+# every still-open mock offer independently rolls a per-tenor fill chance
+# (shorter/more liquid tenors fill faster), simulating real partial-fill-
+# over-time behavior without needing live network access.
 # ---------------------------------------------------------------------------
 class MockBitfinexClient(BitfinexClient):
+    FILL_PROB_PER_CYCLE = {2: 0.55, 7: 0.35, 30: 0.15, EXTREME_TENOR: 0.05}
+
     def __init__(self):
         super().__init__()
         import random
         self._rng = random.Random(42)
-        self._base_daily_rate_2d = 0.07 / 365  # ~7% APR, matches the real snapshot median
+        self._base_daily_rate_2d = 0.07 / 365
         self._offers = []
         self._next_offer_id = 1000
 
     def get_funding_book(self, symbol: str, precision: str = "P0", length: int = 100):
         self._base_daily_rate_2d = max(0.00003, self._base_daily_rate_2d + self._rng.uniform(-0.000015, 0.000015))
-        premium_pp = self._rng.choice([0.0, 0.01, 0.02, 0.04])  # sometimes flat, sometimes a real premium
+        premium_pp = self._rng.choice([0.0, 0.01, 0.02, 0.04])
         book = []
         for tenor, weight in [(2, 40), (7, 8), (30, 3), (120, 1)]:
-            n_rows = weight
-            for i in range(n_rows):
+            for i in range(weight):
                 if tenor == 2:
                     rate = self._base_daily_rate_2d * (1 + i * 0.01)
                 else:
@@ -462,7 +498,17 @@ class MockBitfinexClient(BitfinexClient):
         return [["funding", 0, 1, 1], ["orders", 0, 1, 1], ["wallets", 0, 1, 0]]
 
     def get_active_funding_offers(self, symbol: str):
-        return self._offers
+        """Simulates fills: each still-open offer independently rolls a
+        per-tenor probability of having been matched since the last check."""
+        still_open = []
+        for o in self._offers:
+            period = o[15]
+            prob = self.FILL_PROB_PER_CYCLE.get(period, 0.10)
+            if self._rng.random() < prob:
+                continue  # simulated fill
+            still_open.append(o)
+        self._offers = still_open
+        return still_open
 
     def submit_funding_offer(self, symbol, amount, daily_rate, period_days):
         offer = [self._next_offer_id, symbol, int(time.time() * 1000), None, amount, amount,
@@ -472,7 +518,7 @@ class MockBitfinexClient(BitfinexClient):
         return offer
 
     def cancel_funding_offer(self, offer_id):
-        self._offers = [o for o in self._offers if o[0] != offer_id]
+        self._offers = [o for o in self._offers if str(o[0]) != str(offer_id)]
         return {"status": "cancelled", "id": offer_id}
 
 
@@ -493,12 +539,9 @@ def assert_minimal_permissions(client: BitfinexClient):
 
 
 # ---------------------------------------------------------------------------
-# Live-book-driven tenor allocation (replaces v3's static ladder)
+# Live-book-driven tenor allocation
 # ---------------------------------------------------------------------------
 def best_rate_by_tenor(book: list, target_tenors=TARGET_TENORS) -> dict:
-    """Scans the full funding book and returns {tenor_days: best (lowest)
-    daily_rate actually quoted at that tenor right now}, restricted to
-    target_tenors. A tenor with no rows in the current book is omitted."""
     out = {}
     for row in book:
         rate, period = row[0], row[1]
@@ -509,12 +552,6 @@ def best_rate_by_tenor(book: list, target_tenors=TARGET_TENORS) -> dict:
 
 
 def decide_tenor_allocation(tenor_rates: dict, cfg: StrategyConfig) -> dict:
-    """Given the live best rate at each available tenor, decide what
-    fraction of lendable capital goes to each tenor. Data-driven, not a
-    fixed lookup table: only shifts capital to a longer tenor when the
-    CURRENTLY observed premium (net of fee) clears cfg.term_premium_min_pp
-    versus the 2-day rate. Falls back entirely to whatever tenors actually
-    have quotes right now."""
     available = sorted(t for t in tenor_rates if t in TARGET_TENORS or
                         (t == EXTREME_TENOR and cfg.authorize_extreme_tenor))
     if not available:
@@ -529,9 +566,6 @@ def decide_tenor_allocation(tenor_rates: dict, cfg: StrategyConfig) -> dict:
         t_net = net_apr(tenor_rates[t] * 365, cfg)
         premium_pp = t_net - short_net
         if premium_pp >= cfg.term_premium_min_pp:
-            # shift capital toward the longer tenor in proportion to how far
-            # the premium clears the threshold, capped at 70% to this bucket
-            # so the short/liquid bucket always keeps some allocation
             shift = min(0.7, 0.25 + (premium_pp - cfg.term_premium_min_pp) * 10)
             alloc[short] -= shift
             alloc[t] = alloc.get(t, 0.0) + shift
@@ -549,9 +583,6 @@ def compute_spike_signal(rate_history: list, cfg: StrategyConfig) -> bool:
 
 
 def build_tranches_for_tenor(capital: float, best_daily_rate: float, tenor_days: int, cfg: StrategyConfig):
-    """Inverted-pyramid split within one tenor bucket, sized against that
-    bucket's own empirically observed typical order size (not one generic
-    figure for every tenor)."""
     per_order = TENOR_TYPICAL_ORDER_SIZE.get(tenor_days, 500.0)
     n = max(1, min(cfg.max_orders_per_cycle, math.ceil(capital / per_order)))
     rates = [best_daily_rate + i * (cfg.tranche_rate_step_apr / 365) for i in range(n)]
@@ -563,16 +594,70 @@ def build_tranches_for_tenor(capital: float, best_daily_rate: float, tenor_days:
 def _place(client: BitfinexClient, cfg: StrategyConfig, state: BotState, now: datetime,
            live: bool, amount: float, rate: float, tenor: int, label: str = "") -> dict:
     implied_gross_apr = rate * 365
-    if live:
-        client.submit_funding_offer(cfg.symbol, amount, rate, tenor)
-        time.sleep(SUBMIT_PACING_SEC)
-    else:
+    is_mock = isinstance(client, MockBitfinexClient)
+    offer_id = None
+    if live or is_mock:
+        resp = client.submit_funding_offer(cfg.symbol, amount, rate, tenor)
+        offer_id = extract_offer_id(resp)
+        if live:
+            time.sleep(SUBMIT_PACING_SEC)
+    if not live:
         log.info(f"  [DRY-RUN]{label} would place: amount={amount:,.2f}  tenor={tenor}d  "
                  f"daily_rate={rate:.6f} (~{implied_gross_apr:.2%} gross / ~{net_apr(implied_gross_apr, cfg):.2%} net)")
-    pos = open_position(state, amount, rate, tenor, now, label=label)
+    pos = open_position(state, amount, rate, tenor, now, label=label, offer_id=offer_id)
     return {"position_id": pos.id, "amount": amount, "principal_component": pos.principal_component,
             "profit_component": pos.profit_component, "daily_rate": rate, "gross_apr": implied_gross_apr,
             "net_apr": net_apr(implied_gross_apr, cfg), "tenor_days": tenor, "label": label}
+
+
+def reconcile_pending_offers(client: BitfinexClient, cfg: StrategyConfig, state: BotState,
+                              tenor_rates: dict, now: datetime, live: bool) -> list:
+    """Checks every still-pending position against the exchange's real open-
+    offers list (fill signal: it's no longer there -- the public API has no
+    per-offer partial-fill amount, so this is the correct and only available
+    signal). Still-open positions are cancelled + immediately re-listed at
+    the current rate if they've waited too long or the market has drifted
+    away from their quoted rate (see docstring finding #6)."""
+    is_mock = isinstance(client, MockBitfinexClient)
+    if not (live or is_mock):
+        return []  # plain dry-run against the real client: nothing was ever really submitted
+
+    open_ids = {str(o[0]) for o in client.get_active_funding_offers(cfg.symbol)}
+    events = []
+    for p in list(state.positions):
+        if p.status != "pending":
+            continue
+        if p.offer_id is None or p.offer_id not in open_ids:
+            mark_filled(p, now)
+            events.append({"event": "filled", "position_id": p.id, "tenor_days": p.tenor_days})
+            continue
+
+        placed_dt = datetime.fromisoformat(p.placed_ts)
+        wait_hours = (now - placed_dt).total_seconds() / 3600
+        max_wait = cfg.max_wait_hours.get(p.tenor_days, 24.0) * cfg.max_wait_multiplier
+        current_rate = tenor_rates.get(p.tenor_days)
+        drift_pp = abs(net_apr(current_rate * 365, cfg) - net_apr(p.daily_rate * 365, cfg)) if current_rate else None
+
+        stale_reason = None
+        if wait_hours >= max_wait:
+            stale_reason = f"waited {wait_hours:.1f}h >= max {max_wait:.1f}h"
+        elif drift_pp is not None and drift_pp >= cfg.rate_drift_threshold_pp:
+            stale_reason = f"rate drifted {drift_pp:.2%} >= threshold {cfg.rate_drift_threshold_pp:.2%}"
+
+        if stale_reason:
+            try:
+                client.cancel_funding_offer(p.offer_id)
+            except Exception as e:
+                log.warning(f"  cancel failed for position {p.id}: {e}")
+            cancel_position(state, p, now)
+            events.append({"event": "cancelled_stale", "position_id": p.id, "tenor_days": p.tenor_days,
+                            "reason": stale_reason})
+            log.info(f"  cancelled stale {p.tenor_days}d position {p.id} ({stale_reason}) -> re-listing")
+            if current_rate is not None:
+                new_rec = _place(client, cfg, state, now, live, p.amount, current_rate, p.tenor_days,
+                                  label=(p.label + "+relist"))
+                events.append({"event": "relisted", **new_rec})
+    return events
 
 
 # ---------------------------------------------------------------------------
@@ -584,27 +669,38 @@ def run_cycle(client: BitfinexClient, cfg: StrategyConfig, state: BotState, rate
     matured = reconcile_matured_positions(state, now)
     if matured:
         interest = sum(p.interest_earned for p in matured)
-        reasoning.append(f"{len(matured)} position(s) matured -> +{interest:,.2f} realized profit, "
-                          f"principal returned to idle pool")
+        reasoning.append(f"{len(matured)} position(s) matured -> +{interest:,.2f} realized profit")
         log.info(f"  {len(matured)} position(s) matured, +{interest:,.2f} profit realized")
 
     book = client.get_funding_book(cfg.symbol)
     if not book:
         log.warning("Empty funding book response, skipping cycle")
         write_audit_log(cfg, {"mode": cfg.mode, "action": "skip", "reason": "empty_funding_book"})
+        save_state(state, cfg.state_path)
         return
 
     tenor_rates = best_rate_by_tenor(book)
     if not tenor_rates:
         log.warning("No quotes at target tenors (2/7/30d), skipping cycle")
         write_audit_log(cfg, {"mode": cfg.mode, "action": "skip", "reason": "no_target_tenor_quotes"})
+        save_state(state, cfg.state_path)
         return
+
+    pending_events = reconcile_pending_offers(client, cfg, state, tenor_rates, now, live)
+    if pending_events:
+        filled_n = sum(1 for e in pending_events if e["event"] == "filled")
+        cancelled_n = sum(1 for e in pending_events if e["event"] == "cancelled_stale")
+        if filled_n:
+            log.info(f"  {filled_n} pending order(s) filled")
+        if cancelled_n:
+            log.info(f"  {cancelled_n} stale pending order(s) cancelled and re-listed")
+        write_audit_log(cfg, {"mode": cfg.mode, "action": "pending_reconcile", "events": pending_events})
 
     short_tenor = min(tenor_rates)
     gross_apr = tenor_rates[short_tenor] * 365
     net = net_apr(gross_apr, cfg)
     rate_history.append(gross_apr)
-    reasoning.append(f"live rates by tenor: " +
+    reasoning.append("live rates by tenor: " +
                       ", ".join(f"{t}d={r*365*100:.2f}%gross/{net_apr(r*365,cfg)*100:.2f}%net" for t, r in sorted(tenor_rates.items())))
 
     lendable = max(0.0, available_balance(state) - cfg.reserved_amount)
@@ -618,8 +714,8 @@ def run_cycle(client: BitfinexClient, cfg: StrategyConfig, state: BotState, rate
         return
 
     if lendable <= 0:
-        reasoning.append("no idle capital available (all currently on loan) -> holding")
-        log.info("No idle capital available this cycle (all currently on loan)")
+        reasoning.append("no idle capital available (all pending or on loan) -> holding")
+        log.info("No idle capital available this cycle (all pending or on loan)")
         write_audit_log(cfg, {"mode": cfg.mode, "action": "hold", "reason": "no_idle_capital",
                                "reasoning": reasoning})
         save_state(state, cfg.state_path)
@@ -628,15 +724,19 @@ def run_cycle(client: BitfinexClient, cfg: StrategyConfig, state: BotState, rate
     if cfg.mode == "frr":
         tenor = short_tenor
         log.info(f"[FRR mode] pegging to FRR, tenor={tenor}d (floats hourly)")
-        if live:
-            client.submit_frr_offer(cfg.symbol, lendable, tenor)
-        # The API call above uses rate=0 to mean "peg to FRR" (a live-order
-        # instruction to Bitfinex), but the LEDGER must not record a 0%
-        # accrual rate or this position would silently earn nothing.
-        # Actual hourly-floating FRR settlement isn't tracked tick-by-tick
-        # here; the currently observed short-tenor rate is used as a
-        # disclosed proxy for interest bookkeeping.
-        pos = open_position(state, lendable, tenor_rates[short_tenor], tenor, now, label="frr")
+        is_mock = isinstance(client, MockBitfinexClient)
+        offer_id = None
+        if live or is_mock:
+            resp = client.submit_frr_offer(cfg.symbol, lendable, tenor)
+            offer_id = extract_offer_id(resp)
+            if live:
+                time.sleep(SUBMIT_PACING_SEC)
+        if not live:
+            log.info(f"  [DRY-RUN] would place FRR-pegged offer: amount={lendable:,.2f}  period={tenor}d")
+        # rate=0 is the live API's "peg to FRR" instruction; the ledger must
+        # not record 0% accrual or this position would earn nothing, so it's
+        # booked against the observed short-tenor rate as a disclosed proxy.
+        pos = open_position(state, lendable, tenor_rates[short_tenor], tenor, now, label="frr", offer_id=offer_id)
         write_audit_log(cfg, {"mode": cfg.mode, "action": "place_frr", "amount": lendable, "tenor_days": tenor,
                                "gross_apr": gross_apr, "net_apr": net, "reasoning": reasoning,
                                "position_id": pos.id})
@@ -647,8 +747,7 @@ def run_cycle(client: BitfinexClient, cfg: StrategyConfig, state: BotState, rate
     placed_records = []
 
     if cfg.mode == "dave_fast":
-        rec = _place(client, cfg, state, now, live, lendable, tenor_rates[short_tenor], short_tenor)
-        placed_records.append(rec)
+        placed_records.append(_place(client, cfg, state, now, live, lendable, tenor_rates[short_tenor], short_tenor))
         reasoning.append(f"Dave Fast: single tranche, most liquid tenor ({short_tenor}d)")
     elif cfg.mode == "barbell":
         long_tenor = max([t for t in tenor_rates if t != short_tenor and t <= 30], default=short_tenor)
@@ -677,7 +776,7 @@ def run_cycle(client: BitfinexClient, cfg: StrategyConfig, state: BotState, rate
                 placed_records.append(_place(client, cfg, state, now, live, amount, rate, tenor))
 
     log.info(f"Placed {len(placed_records)} tranche(s) across "
-             f"{len(set(r['tenor_days'] for r in placed_records))} tenor(s) this cycle")
+             f"{len(set(r['tenor_days'] for r in placed_records))} tenor(s) this cycle (status=pending until filled)")
     write_audit_log(cfg, {"mode": cfg.mode, "action": "place", "gross_apr": gross_apr, "net_apr": net,
                            "spike_signal": spike if cfg.mode != "dave_fast" else None,
                            "tranches": placed_records, "reasoning": reasoning,
@@ -691,42 +790,38 @@ def main():
     ap.add_argument("--mode", choices=["dave_high", "dave_fast", "custom", "frr", "barbell"], default="dave_high")
     ap.add_argument("--floor-rate", type=float, default=0.05)
     ap.add_argument("--reserved-amount", type=float, default=0.0)
-    ap.add_argument("--term-premium-min-pp", type=float, default=0.02,
-                     help="Minimum LIVE net-APR premium (as a fraction, e.g. 0.02=2pp) required before "
-                          "shifting capital to a longer tenor. See docstring #3 for the empirical range "
-                          "(0.78pp same-day snapshot to 3.65pp 5-year median) this default sits inside.")
-    ap.add_argument("--authorize-extreme-tenor", action="store_true",
-                     help="Allow the 120d bucket (measured no rate premium over 30d in 5y of data -- "
-                          "opt-in only, e.g. for a specific large block trade)")
+    ap.add_argument("--term-premium-min-pp", type=float, default=0.02)
+    ap.add_argument("--authorize-extreme-tenor", action="store_true")
     ap.add_argument("--barbell-short-fraction", type=float, default=0.5)
-    ap.add_argument("--max-orders-per-cycle", type=int, default=400,
-                     help="Safety bound on tranche count per cycle (not a Bitfinex-imposed limit -- "
-                          "none is published). Lower this only if you deliberately want fewer, larger "
-                          "tranches than the real per-tenor trade-size calibration would produce.")
+    ap.add_argument("--max-orders-per-cycle", type=int, default=400)
+    ap.add_argument("--max-wait-multiplier", type=float, default=1.0,
+                     help=f"Scales the default per-tenor max-wait-before-cancel thresholds "
+                          f"({DEFAULT_MAX_WAIT_HOURS} hours) -- a disclosed heuristic, not measured "
+                          f"queue-time data. >1 = more patient, <1 = more aggressive relisting.")
+    ap.add_argument("--rate-drift-threshold-pp", type=float, default=0.01,
+                     help="Cancel+relist a pending order if the live net-APR at its tenor has moved "
+                          "away from its quoted rate by at least this much (0.01=1pp).")
     ap.add_argument("--order-visibility", choices=["standard", "hidden"], default="standard")
     ap.add_argument("--state-file", default="bfx_bot_state.json")
-    ap.add_argument("--contribute", type=float, default=0.0,
-                     help="Add this amount as NEW PRINCIPAL to the ledger before this run (e.g. initial funding)")
+    ap.add_argument("--contribute", type=float, default=0.0)
     ap.add_argument("--audit-log", default="bfx_bot_audit_log.jsonl")
-    ap.add_argument("--export-csv", default=None, help="Export the full position ledger to this CSV path and continue")
-    ap.add_argument("--export-tenor", type=int, default=None, help="Filter --export-csv to one tenor (2/7/30/120)")
-    ap.add_argument("--export-start", default=None, help="Filter --export-csv: ISO date, e.g. 2026-01-01")
-    ap.add_argument("--export-end", default=None, help="Filter --export-csv: ISO date, e.g. 2026-12-31")
+    ap.add_argument("--export-csv", default=None)
+    ap.add_argument("--export-tenor", type=int, default=None)
+    ap.add_argument("--export-start", default=None)
+    ap.add_argument("--export-end", default=None)
     ap.add_argument("--live", action="store_true")
     ap.add_argument("--mock", action="store_true")
     ap.add_argument("--cycles", type=int, default=1)
-    ap.add_argument("--poll-interval", type=int, default=5, help="Real seconds slept between cycles (mock/demo)")
-    ap.add_argument("--mock-days-per-cycle", type=float, default=0,
-                     help="Mock mode only: fast-forward the simulated clock by this many days each cycle, "
-                          "so positions actually mature within a short test run (0 = use real wall-clock)")
+    ap.add_argument("--poll-interval", type=int, default=5)
+    ap.add_argument("--mock-days-per-cycle", type=float, default=0)
     args = ap.parse_args()
 
     cfg = StrategyConfig(
         symbol=args.symbol, mode=args.mode, floor_rate=args.floor_rate, reserved_amount=args.reserved_amount,
         term_premium_min_pp=args.term_premium_min_pp, authorize_extreme_tenor=args.authorize_extreme_tenor,
         barbell_short_fraction=args.barbell_short_fraction, max_orders_per_cycle=args.max_orders_per_cycle,
-        order_visibility=args.order_visibility,
-        state_path=args.state_file, audit_log_path=args.audit_log or None,
+        max_wait_multiplier=args.max_wait_multiplier, rate_drift_threshold_pp=args.rate_drift_threshold_pp,
+        order_visibility=args.order_visibility, state_path=args.state_file, audit_log_path=args.audit_log or None,
     )
 
     state = load_state(cfg.state_path)
@@ -738,7 +833,7 @@ def main():
 
     if args.mock:
         client = MockBitfinexClient()
-        log.info("Using MOCK client (synthetic funding book, no network access)")
+        log.info("Using MOCK client (synthetic funding book + simulated pending/fill lifecycle)")
     else:
         api_key = os.environ.get("BFX_API_KEY")
         api_secret = os.environ.get("BFX_API_SECRET")
@@ -773,11 +868,14 @@ def main():
     reconcile_matured_positions(state, sim_now)
     save_state(state, cfg.state_path)
 
-    net_worth = available_balance(state) + sum(p.amount for p in state.positions if p.status == "active")
+    pending_n = sum(1 for p in state.positions if p.status == "pending")
+    active_n = sum(1 for p in state.positions if p.status == "active")
+    cancelled_n = sum(1 for p in state.positions if p.status == "cancelled")
+    net_worth = available_balance(state) + sum(p.amount for p in state.positions if p.status in ("active", "pending"))
     log.info(f"--- final ledger: principal_contributed={state.principal_contributed_total:,.2f}  "
              f"realized_profit_total={state.realized_profit_total:,.2f}  "
              f"idle_principal={state.idle_principal:,.2f}  idle_profit={state.idle_profit:,.2f}  "
-             f"active_positions={sum(1 for p in state.positions if p.status=='active')}  "
+             f"pending={pending_n}  active={active_n}  cancelled_stale={cancelled_n}  "
              f"net_worth_estimate={net_worth:,.2f} ---")
 
     if args.export_csv:

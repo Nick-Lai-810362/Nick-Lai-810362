@@ -79,3 +79,11 @@ class MockBitfinexClient(BitfinexClient):
     def cancel_funding_offer(self, offer_id):
         self._offers = [o for o in self._offers if str(o[0]) != str(offer_id)]
         return {"status": "cancelled", "id": offer_id}
+
+    def get_wallet_balances(self):
+        committed = sum(o[4] for o in self._offers)  # AMOUNT of each still-open offer
+        available = round(50_000.0 - committed, 2)
+        return [["funding", "USD", available + committed, 0, max(0.0, available)]]
+
+    def get_funding_loans_history(self, symbol: str, limit: int = 200):
+        return []  # webapp.py falls back to the local ledger when this is empty

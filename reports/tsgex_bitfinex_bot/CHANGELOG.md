@@ -1,5 +1,77 @@
 # Changelog
 
+## v5.3 (real, API-connected local web dashboard)
+
+The user pointed out the only dashboard that existed (the CSV-import
+Artifact from the v5 revision) was import-only and had none of: an
+API-connected view, asset overview, open-order detail, total/annualized
+earnings, principal, lending history, or switching between sub-accounts with
+different API keys -- and asked for all of it to actually be built, not just
+described.
+
+**Why this had to be a new local web server, not more work on the existing
+Artifact:** a claude.ai Artifact page's sandbox blocks browser-side
+`fetch`/`XHR` to any host outside a small CDN allowlist, and
+`api.bitfinex.com` is not on it -- a browser-only Artifact page cannot call
+the live Bitfinex API AT ALL, full stop, regardless of how the page is
+written. This is a hard platform constraint discovered by reading the
+Artifact tool's own documented CSP, not a design tradeoff. Calling the real,
+authenticated API needs a real backend making the signed HTTP request
+server-side, so "串接 API 的頁面" and "切換不同子帳號串接不同 API" could only
+be honestly delivered as a local web server the user runs on their own
+machine (`python tsgex_bitfinex_dashboard.py`) using the bot's own existing
+`client.py`.
+
+**New: `tsgex_bfx_bot/webapp.py`** -- a plain Python `http.server` (stdlib
+only, no new dependency) binding to `127.0.0.1` by default (refuses any
+other host without `--allow-remote`, since this can show real account
+balances) and serving:
+- `GET /` -- `webapp_static/dashboard.html`, a real multi-tab SPA: 資產總覽 /
+  掛單詳情 / 出借歷史紀錄 / 收益與年化報酬.
+- `GET /api/{overview,offers,history,earnings,apr}?profile=X` -- JSON backed
+  by the bot's own local ledger (`bfx_bot_state.json`), always available with
+  zero API keys or network access, PLUS an optional live-data overlay
+  (Bitfinex funding-wallet balance via a new `client.get_wallet_balances()`,
+  and a live open-offer count via the existing `get_active_funding_offers()`)
+  when a profile has working credentials -- every live call is wrapped so a
+  missing key or network failure degrades to "local ledger only, live
+  overlay unavailable," never a crash. Neither new client method has been
+  verified against a real Bitfinex call (network egress to Bitfinex is
+  blocked in the sandbox this bot was developed in) -- same disclosed caveat
+  as `extract_offer_id()` from v5.0.0.
+- `GET /api/profiles` + `--profiles-file` (`profiles.py`) -- multiple named
+  sub-accounts, each with its OWN state file and OWN env-var names for its
+  key/secret (never the credentials themselves, so a shared profiles.json
+  never leaks a secret, matching cli.py's existing env-var-only convention).
+  Switching accounts in the dashboard is a dropdown, no restart needed.
+
+**New: `tsgex_bfx_bot/analytics.py`** -- the actual numbers requested,
+computed as pure, unit-tested functions over `BotState` (shared by the API
+and directly testable without spinning up a server): `overview()` (principal
+contributed, idle principal/profit, committed active/pending, net worth
+estimate), `open_offers()` (current pending/active orders with gross/net
+APR), `history()` (the full filterable lending-history table), `earnings()`
+(realized profit total, cumulative-by-maturity series, profit by tenor), and
+`apr()` (two distinct, both-legitimate readings: current amount-weighted APR
+of just-active capital, and a conservative realized-APR annualizing total
+realized profit against total contributed principal since the earliest
+position -- see the function's docstring for a real caveat found via manual
+smoke-testing: this realized-APR figure goes nonsensical if computed against
+a ledger built with `--mock-days-per-cycle`, since that fast-forwards
+position timestamps ahead of real wall-clock time; irrelevant to real
+trading, only to fast-forwarded mock demos).
+
+Verified end-to-end against a REAL generated ledger (not just synthetic
+pytest fixtures): ran the bot for 10 fast-forwarded mock cycles, pointed
+`tsgex_bitfinex_dashboard.py --mock` at the resulting state file, and curled
+every route.
+
+Also kept the original CSV-import Artifact dashboard around
+(`reports/TSGEX_Bitfinex_Bot_Dashboard.html`) as a lighter option for
+eyeballing an exported CSV without running anything locally -- it never had,
+and structurally cannot have, live-API or multi-account features, for the
+same CSP reason above.
+
 ## v5.2 (generalized N-tenor allocation, fixed_count tranche mode, rate-unit + min-order-size re-verification)
 
 Three follow-up questions from the user, answered by research where a claim

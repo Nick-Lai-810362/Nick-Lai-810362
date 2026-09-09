@@ -68,3 +68,24 @@ def test_same_seed_is_fully_reproducible():
     b = MockBitfinexClient(seed=7)
     assert a.get_funding_book("fUSD") == b.get_funding_book("fUSD")
     assert a.get_funding_book("fUSD") == b.get_funding_book("fUSD")  # second call too
+
+
+def test_get_wallet_balances_returns_one_funding_usd_row():
+    client = MockBitfinexClient()
+    wallets = client.get_wallet_balances()
+    assert len(wallets) == 1
+    assert wallets[0][0] == "funding"
+    assert wallets[0][1] == "USD"
+
+
+def test_get_wallet_balances_reflects_committed_offers():
+    client = MockBitfinexClient()
+    before = client.get_wallet_balances()[0][4]  # available balance
+    client.submit_funding_offer("fUSD", 1000.0, 0.0002, 2)
+    after = client.get_wallet_balances()[0][4]
+    assert after == before - 1000.0
+
+
+def test_get_funding_loans_history_returns_empty_list():
+    client = MockBitfinexClient()
+    assert client.get_funding_loans_history("fUSD") == []

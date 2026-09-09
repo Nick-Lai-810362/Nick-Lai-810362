@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>TSGEX 放貸機器人儀表板</title>
+<style>
+  :root {
+    --bg: #f7f7f5; --surface: #ffffff; --border: rgba(0,0,0,.10);
+    --text: #16160f; --text-2: #55544c; --text-3: #8a8880;
+    --accent: #2a6f4b; --accent-2: #b3532b; --danger: #b23b3b; --warn: #a4780c;
+    --pill-pending: #a4780c; --pill-active: #2a6f9b; --pill-matured: #2a6f4b; --pill-cancelled: #8a8880;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#111110; --surface:#1a1a18; --border:rgba(255,255,255,.12); --text:#f2f2ee; --text-2:#c7c6bd; --text-3:#8f8e86; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font-family:-apple-system,"Segoe UI",system-ui,sans-serif; }
+  header { display:flex; align-items:center; gap:14px; padding:14px 22px; border-bottom:1px solid var(--border); background:var(--surface); flex-wrap:wrap; position:sticky; top:0; z-index:5; }
+  header h1 { font-size:16px; margin:0; font-weight:700; white-space:nowrap; }
+  header .spacer { flex:1; }
+  select, input[type=date] { font-size:13px; padding:6px 9px; border-radius:7px; border:1px solid var(--border); background:var(--bg); color:var(--text); }
+  button { font-size:13px; padding:7px 13px; border-radius:7px; border:1px solid var(--border); background:var(--bg); color:var(--text); cursor:pointer; }
+  button.primary { background:var(--accent); border-color:var(--accent); color:#fff; font-weight:600; }
+  button:hover { filter:brightness(1.06); }
+  .status-dot { width:8px; height:8px; border-radius:50%; display:inline-block; margin-right:6px; }
+  .status-dot.ok { background:var(--accent); }
+  .status-dot.off { background:var(--text-3); }
+  .status-dot.err { background:var(--danger); }
+  .conn { font-size:12px; color:var(--text-2); display:flex; align-items:center; }
+  nav { display:flex; gap:4px; padding:0 22px; border-bottom:1px solid var(--border); background:var(--surface); overflow-x:auto; }
+  nav button { border:none; border-radius:0; background:transparent; padding:12px 14px; font-weight:600; color:var(--text-3); border-bottom:2px solid transparent; }
+  nav button.active { color:var(--accent); border-bottom-color:var(--accent); }
+  main { max-width:1180px; margin:0 auto; padding:20px 22px 70px; }
+  .tab { display:none; }
+  .tab.active { display:block; }
+  .panel { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:16px 18px; margin-bottom:16px; }
+  .panel h2 { font-size:14px; margin:0 0 12px; }
+  .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:12px; }
+  .card { background:var(--bg); border:1px solid var(--border); border-radius:10px; padding:12px 14px; }
+  .card .label { font-size:11.5px; color:var(--text-3); margin-bottom:5px; }
+  .card .value { font-size:19px; font-weight:700; font-variant-numeric:tabular-nums; }
+  .card .value.profit { color:var(--accent); }
+  .card .sub { font-size:11px; color:var(--text-3); margin-top:3px; }
+  .hint { font-size:12px; color:var(--text-3); }
+  .filters { display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-bottom:14px; }
+  .ff { display:flex; flex-direction:column; gap:4px; }
+  .ff label { font-size:11px; color:var(--text-3); }
+  table { width:100%; border-collapse:collapse; font-size:12.5px; }
+  thead th { text-align:left; font-weight:600; color:var(--text-3); font-size:10.5px; text-transform:uppercase; letter-spacing:.02em; padding:6px 8px; border-bottom:1px solid var(--border); position:sticky; top:0; background:var(--surface); }
+  tbody td { padding:6px 8px; border-bottom:1px solid var(--border); font-variant-numeric:tabular-nums; white-space:nowrap; }
+  tbody tr:hover { background:var(--bg); }
+  .table-scroll { max-height:440px; overflow:auto; border:1px solid var(--border); border-radius:8px; }
+  .pill { font-size:10.5px; padding:2px 8px; border-radius:999px; font-weight:600; color:#fff; }
+  .pill.pending { background:var(--pill-pending); } .pill.active { background:var(--pill-active); }
+  .pill.matured { background:var(--pill-matured); } .pill.cancelled { background:var(--pill-cancelled); }
+  .row-count { font-size:12px; color:var(--text-3); margin-top:8px; }
+  .chart-grid { display:grid; grid-template-columns:1.3fr 1fr; gap:16px; }
+  @media (max-width:760px) { .chart-grid { grid-template-columns:1fr; } }
+  .chart-empty { color:var(--text-3); font-size:13px; padding:40px 0; text-align:center; }
+  .banner { font-size:12px; padding:9px 12px; border-radius:8px; margin-bottom:14px; }
+  .banner.warn { background:color-mix(in srgb, var(--warn) 14%, transparent); color:var(--warn); }
+  .banner.err { background:color-mix(in srgb, var(--danger) 14%, transparent); color:var(--danger); }
+  .banner.ok { background:color-mix(in srgb, var(--accent) 14%, transparent); color:var(--accent); }
+  .empty-state { text-align:center; padding:60px 20px; color:var(--text-3); }
+  .tooltip { position:absolute; pointer-events:none; background:var(--text); color:var(--bg); font-size:11px; padding:5px 8px; border-radius:5px; white-space:nowrap; opacity:0; transition:opacity .1s; z-index:20; transform:translate(-50%,-100%); }
+</style>
+</head>
+<body>
+<header>
+  <h1>TSGEX 放貸機器人儀表板</h1>
+  <div class="ff"><label for="profileSel">帳戶</label>
+    <select id="profileSel"></select>
+  </div>
+  <div class="spacer"></div>
+  <span class="conn" id="connStatus"><span class="status-dot off"></span>尚未連線</span>
+  <button id="refreshBtn">重新整理</button>
+</header>
+<nav id="tabNav">
+  <button data-tab="overview" class="active">資產總覽</button>
+  <button data-tab="offers">掛單詳情</button>
+  <button data-tab="history">出借歷史紀錄</button>
+  <button data-tab="earnings">收益與年化報酬</button>
+</nav>
+<main>
+  <div id="globalBanner"></div>
+
+  <div class="tab active" id="tab-overview">
+    <div class="panel">
+      <h2>本金與資金狀態</h2>
+      <div class="cards" id="overviewCards"></div>
+    </div>
+    <div class="panel" id="liveWalletPanel" hidden>
+      <h2>即時交易所資金錢包（Bitfinex Funding Wallet，即時對帳用）</h2>
+      <div class="cards" id="liveWalletCards"></div>
+    </div>
+  </div>
+
+  <div class="tab" id="tab-offers">
+    <div class="panel">
+      <h2>目前掛單（等待成交中 / 使用中）</h2>
+      <div class="hint" id="offersLiveHint" style="margin-bottom:10px;"></div>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>狀態</th><th>天期</th><th>金額</th><th>日利率</th><th>毛年化</th><th>淨年化(估)</th><th>下單時間</th><th>成交時間</th><th>到期時間</th><th>掛單ID</th></tr></thead>
+          <tbody id="offersBody"></tbody>
+        </table>
+      </div>
+      <div class="row-count" id="offersCount"></div>
+    </div>
+  </div>
+
+  <div class="tab" id="tab-history">
+    <div class="panel">
+      <h2>篩選</h2>
+      <div class="filters">
+        <div class="ff"><label for="fTenor">天期</label><select id="fTenor"><option value="">全部</option></select></div>
+        <div class="ff"><label for="fStatus">狀態</label>
+          <select id="fStatus"><option value="">全部</option><option value="pending">等待成交中</option><option value="active">使用中</option><option value="matured">已到期</option><option value="cancelled">已撤銷重掛</option></select>
+        </div>
+        <div class="ff"><label for="fStart">起始日期</label><input type="date" id="fStart" /></div>
+        <div class="ff"><label for="fEnd">結束日期</label><input type="date" id="fEnd" /></div>
+        <button class="primary" id="applyFilterBtn">套用篩選</button>
+        <button id="downloadCsvBtn">下載目前結果 CSV</button>
+      </div>
+    </div>
+    <div class="panel">
+      <h2>部位明細</h2>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>狀態</th><th>標籤</th><th>天期</th><th>金額</th><th>本金部分</th><th>利潤部分</th><th>毛年化</th><th>淨年化(估)</th><th>下單時間</th><th>成交時間</th><th>到期時間</th><th>已實現利潤</th></tr></thead>
+          <tbody id="historyBody"></tbody>
+        </table>
+      </div>
+      <div class="row-count" id="historyCount"></div>
+    </div>
+  </div>
+
+  <div class="tab" id="tab-earnings">
+    <div class="panel">
+      <h2>收益總覽</h2>
+      <div class="cards" id="earningsCards"></div>
+    </div>
+    <div class="panel">
+      <div class="chart-grid">
+        <div>
+          <div style="font-size:12px;color:var(--text-2);margin-bottom:6px;">累積已實現利潤（依到期時間）</div>
+          <div id="lineChartWrap"></div>
+        </div>
+        <div>
+          <div style="font-size:12px;color:var(--text-2);margin-bottom:6px;">各天期已實現利潤</div>
+          <div id="barChartWrap"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+(function(){
+  const STATUS_LABEL = {pending:'等待成交中', active:'使用中', matured:'已到期', cancelled:'已撤銷重掛'};
+  let profiles = [];
+  let currentProfile = null;
+  let lastHistoryRows = [];
+
+  function fmtUSD(n) { if (n===null||n===undefined) return '—'; return '$' + n.toLocaleString('en-US',{maximumFractionDigits:0}); }
+  function fmtPct(n) { if (n===null||n===undefined) return '—'; return (n*100).toFixed(2) + '%'; }
+  function fmtDate(iso) { if (!iso) return '—'; return iso.slice(0,10) + ' ' + iso.slice(11,16); }
+
+  async function api(path) {
+    const url = path + (path.includes('?') ? '&' : '?') + 'profile=' + encodeURIComponent(currentProfile);
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('API ' + path + ' -> HTTP ' + res.status);
+    return res.json();
+  }
+
+  function setBanner(kind, text) {
+    const el = document.getElementById('globalBanner');
+    if (!text) { el.innerHTML = ''; return; }
+    el.innerHTML = `<div class="banner ${kind}">${text}</div>`;
+  }
+
+  function setConn(state, text) {
+    const el = document.getElementById('connStatus');
+    const cls = state === 'ok' ? 'ok' : state === 'err' ? 'err' : 'off';
+    el.innerHTML = `<span class="status-dot ${cls}"></span>${text}`;
+  }
+
+  // ---- tabs ----
+  document.getElementById('tabNav').addEventListener('click', (ev) => {
+    const btn = ev.target.closest('button[data-tab]');
+    if (!btn) return;
+    document.querySelectorAll('#tabNav button').forEach(b => b.classList.toggle('active', b===btn));
+    document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.id === 'tab-' + btn.dataset.tab));
+  });
+
+  // ---- profiles ----
+  async function loadProfiles() {
+    profiles = await (await fetch('/api/profiles')).json();
+    const sel = document.getElementById('profileSel');
+    sel.innerHTML = profiles.map(p => `<option value="${p.name}">${p.name}${p.has_credentials ? '' : '（未設定金鑰）'}</option>`).join('');
+    currentProfile = profiles[0] ? profiles[0].name : null;
+    sel.value = currentProfile;
+  }
+  document.getElementById('profileSel').addEventListener('change', (ev) => {
+    currentProfile = ev.target.value;
+    loadAll();
+  });
+
+  // ---- overview ----
+  async function loadOverview() {
+    const d = await api('/api/overview');
+    const o = d.overview;
+    document.getElementById('overviewCards').innerHTML = [
+      ['累計投入本金', fmtUSD(o.principal_contributed_total), ''],
+      ['閒置本金', fmtUSD(o.idle_principal), ''],
+      ['閒置利潤', fmtUSD(o.idle_profit), 'profit'],
+      ['使用中金額（已成交）', fmtUSD(o.committed_active), ''],
+      ['等待成交中金額', fmtUSD(o.committed_pending), ''],
+      ['已實現利潤總額', fmtUSD(o.realized_profit_total), 'profit'],
+      ['淨值估計', fmtUSD(o.net_worth_estimate), ''],
+      ['目前未平倉部位數', o.position_count_open.toLocaleString(), ''],
+    ].map(([l,v,c]) => `<div class="card"><div class="label">${l}</div><div class="value ${c}">${v}</div></div>`).join('');
+
+    const panel = document.getElementById('liveWalletPanel');
+    if (d.live && d.live.available && d.live.funding_wallet_usd) {
+      panel.hidden = false;
+      const w = d.live.funding_wallet_usd;
+      document.getElementById('liveWalletCards').innerHTML = [
+        ['資金錢包餘額（USD）', fmtUSD(w.balance), ''],
+        ['可動用餘額（USD）', fmtUSD(w.balance_available), ''],
+      ].map(([l,v,c]) => `<div class="card"><div class="label">${l}</div><div class="value ${c}">${v}</div></div>`).join('');
+    } else {
+      panel.hidden = true;
+    }
+    return d.live;
+  }
+
+  // ---- offers ----
+  async function loadOffers() {
+    const d = await api('/api/offers');
+    const rows = d.offers;
+    document.getElementById('offersBody').innerHTML = rows.map(r => `
+      <tr>
+        <td><span class="pill ${r.status}">${STATUS_LABEL[r.status]||r.status}</span></td>
+        <td>${r.tenor_days}d</td><td>${fmtUSD(r.amount)}</td><td>${(r.daily_rate*100).toFixed(4)}%</td>
+        <td>${fmtPct(r.gross_apr)}</td><td>${fmtPct(r.net_apr)}</td>
+        <td>${fmtDate(r.placed_ts)}</td><td>${fmtDate(r.filled_ts)}</td><td>${fmtDate(r.maturity_ts)}</td>
+        <td>${r.offer_id || '—'}</td>
+      </tr>`).join('');
+    document.getElementById('offersCount').textContent = `共 ${rows.length.toLocaleString()} 筆`;
+    const hint = document.getElementById('offersLiveHint');
+    if (d.live && d.live.available) {
+      hint.textContent = `即時對帳：Bitfinex 交易所目前顯示 ${d.live.count} 筆掛單（本地帳本 ${rows.length} 筆 pending/active）` +
+        (d.live.count !== rows.length ? ' — 數字不一致，可能有其他來源同時在操作此帳戶，建議人工核對。' : '，一致。');
+    } else {
+      hint.textContent = '即時對帳目前無法使用' + (d.live && d.live.error ? `（${d.live.error}）` : '（尚未設定此帳戶的 API 金鑰，或無法連線至 Bitfinex）') + '，以下為本地帳本記錄。';
+    }
+    return d.live;
+  }
+
+  // ---- history ----
+  function populateTenorFilter(rows) {
+    const tenors = Array.from(new Set(rows.map(r => r.tenor_days))).sort((a,b)=>a-b);
+    const sel = document.getElementById('fTenor');
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">全部</option>' + tenors.map(t => `<option value="${t}">${t} 天</option>`).join('');
+    sel.value = cur;
+  }
+
+  async function loadHistory() {
+    const tenor = document.getElementById('fTenor').value;
+    const status = document.getElementById('fStatus').value;
+    const start = document.getElementById('fStart').value;
+    const end = document.getElementById('fEnd').value;
+    let q = '/api/history';
+    const params = [];
+    if (tenor) params.push('tenor=' + encodeURIComponent(tenor));
+    if (status) params.push('status=' + encodeURIComponent(status));
+    if (start) params.push('start=' + encodeURIComponent(start));
+    if (end) params.push('end=' + encodeURIComponent(end));
+    if (params.length) q += '?' + params.join('&');
+    const d = await api(q);
+    lastHistoryRows = d.history;
+    if (!tenor) populateTenorFilter(d.history);
+    document.getElementById('historyBody').innerHTML = d.history.map(r => `
+      <tr>
+        <td><span class="pill ${r.status}">${STATUS_LABEL[r.status]||r.status}</span></td>
+        <td>${r.label||'—'}</td><td>${r.tenor_days}d</td><td>${fmtUSD(r.amount)}</td>
+        <td>${fmtUSD(r.principal_component)}</td><td>${fmtUSD(r.profit_component)}</td>
+        <td>${fmtPct(r.gross_apr)}</td><td>${fmtPct(r.net_apr)}</td>
+        <td>${fmtDate(r.placed_ts)}</td><td>${fmtDate(r.filled_ts)}</td><td>${fmtDate(r.maturity_ts)}</td>
+        <td>${r.interest_earned!==null&&r.interest_earned!==undefined ? fmtUSD(r.interest_earned) : '—'}</td>
+      </tr>`).join('');
+    document.getElementById('historyCount').textContent = `共 ${d.history.length.toLocaleString()} 筆`;
+  }
+  document.getElementById('applyFilterBtn').addEventListener('click', loadHistory);
+  document.getElementById('downloadCsvBtn').addEventListener('click', () => {
+    const header = ['id','status','label','tenor_days','amount','principal_component','profit_component',
+      'daily_rate','gross_apr','net_apr','placed_ts','filled_ts','maturity_ts','matured_ts','interest_earned'];
+    const lines = [header.join(',')];
+    lastHistoryRows.forEach(r => lines.push(header.map(h => r[h] ?? '').join(',')));
+    const blob = new Blob([lines.join('\n')], {type:'text/csv'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `bfx_bot_history_${currentProfile}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+
+  // ---- earnings + apr ----
+  async function loadEarnings() {
+    const [e, a] = await Promise.all([api('/api/earnings'), api('/api/apr')]);
+    document.getElementById('earningsCards').innerHTML = [
+      ['已實現利潤總額', fmtUSD(e.realized_profit_total), 'profit'],
+      ['已到期部位數', e.matured_position_count.toLocaleString(), ''],
+      ['已撤銷重掛次數', e.cancelled_stale_count.toLocaleString(), ''],
+      ['目前使用中資金加權毛年化', fmtPct(a.current_weighted_gross_apr), ''],
+      ['目前使用中資金加權淨年化(估)', fmtPct(a.current_weighted_net_apr), 'profit'],
+      ['歷史實際年化報酬（保守估）', fmtPct(a.realized_apr), 'profit'],
+    ].map(([l,v,c]) => `<div class="card"><div class="label">${l}</div><div class="value ${c}">${v}</div></div>`).join('');
+    renderLineChart(e.cumulative_by_maturity);
+    renderBarChart(e.profit_by_tenor);
+  }
+
+  function renderLineChart(pts) {
+    const wrap = document.getElementById('lineChartWrap');
+    if (!pts || pts.length === 0) { wrap.innerHTML = '<div class="chart-empty">尚無已到期部位</div>'; return; }
+    const data = pts.map(p => ({t: new Date(p.matured_ts).getTime(), v: p.cumulative_profit}));
+    const W=520,H=220,PAD=36;
+    const t0=data[0].t, t1=data[data.length-1].t;
+    const vMax = Math.max(...data.map(p=>p.v), 1);
+    const x = t => t1===t0 ? PAD : PAD + (t-t0)/(t1-t0)*(W-PAD*2);
+    const y = v => H-PAD-(v/vMax)*(H-PAD*2);
+    const path = data.map((p,i)=>(i===0?'M':'L')+x(p.t).toFixed(1)+','+y(p.v).toFixed(1)).join(' ');
+    const area = path + ` L${x(data[data.length-1].t).toFixed(1)},${H-PAD} L${x(data[0].t).toFixed(1)},${H-PAD} Z`;
+    let svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" style="max-width:${W}px;display:block">`;
+    svg += `<line x1="${PAD}" y1="${H-PAD}" x2="${W-8}" y2="${H-PAD}" stroke="var(--border)" stroke-width="1"/>`;
+    svg += `<path d="${area}" fill="var(--accent)" fill-opacity="0.13" stroke="none"/>`;
+    svg += `<path d="${path}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`;
+    data.forEach(p => svg += `<circle cx="${x(p.t).toFixed(1)}" cy="${y(p.v).toFixed(1)}" r="3" fill="var(--accent)" class="pt" data-v="${p.v.toFixed(2)}" data-t="${p.t}"/>`);
+    svg += `<text x="${PAD}" y="14" font-size="11" fill="var(--text-3)">${fmtUSD(vMax)}</text></svg>`;
+    wrap.innerHTML = svg;
+    const tip = document.getElementById('tooltip');
+    wrap.querySelectorAll('.pt').forEach(el => {
+      el.addEventListener('mouseenter', () => {
+        const r = el.getBoundingClientRect();
+        tip.textContent = fmtUSD(parseFloat(el.dataset.v)) + ' · ' + new Date(parseInt(el.dataset.t)).toISOString().slice(0,10);
+        tip.style.left = (r.left + r.width/2 + window.scrollX) + 'px';
+        tip.style.top = (r.top + window.scrollY - 6) + 'px';
+        tip.style.opacity = '1';
+      });
+      el.addEventListener('mouseleave', () => tip.style.opacity = '0');
+    });
+  }
+
+  function renderBarChart(byTenor) {
+    const wrap = document.getElementById('barChartWrap');
+    const tenors = Object.keys(byTenor||{}).map(Number).sort((a,b)=>a-b);
+    if (tenors.length === 0) { wrap.innerHTML = '<div class="chart-empty">尚無已到期部位</div>'; return; }
+    const W=360,H=220,PAD_L=46,PAD_B=30,PAD_T=10;
+    const maxV = Math.max(...tenors.map(t=>byTenor[t]), 1);
+    const gap = (W-PAD_L-16)/tenors.length;
+    const barW = gap*0.6;
+    let svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" style="max-width:${W}px;display:block">`;
+    svg += `<line x1="${PAD_L}" y1="${H-PAD_B}" x2="${W-8}" y2="${H-PAD_B}" stroke="var(--border)" stroke-width="1"/>`;
+    tenors.forEach((t,i) => {
+      const v = byTenor[t];
+      const h = (v/maxV)*(H-PAD_T-PAD_B);
+      const bx = PAD_L + i*gap + (gap-barW)/2, by = H-PAD_B-h;
+      svg += `<rect x="${bx.toFixed(1)}" y="${by.toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" rx="4" fill="var(--accent-2)" class="bar" data-v="${v.toFixed(2)}" data-t="${t}"/>`;
+      svg += `<text x="${(bx+barW/2).toFixed(1)}" y="${H-PAD_B+16}" font-size="11" fill="var(--text-2)" text-anchor="middle">${t}d</text>`;
+    });
+    svg += `<text x="4" y="${PAD_T+8}" font-size="11" fill="var(--text-3)">${fmtUSD(maxV)}</text></svg>`;
+    wrap.innerHTML = svg;
+    const tip = document.getElementById('tooltip');
+    wrap.querySelectorAll('.bar').forEach(el => {
+      el.addEventListener('mouseenter', () => {
+        const r = el.getBoundingClientRect();
+        tip.textContent = el.dataset.t + '天：' + fmtUSD(parseFloat(el.dataset.v));
+        tip.style.left = (r.left + r.width/2 + window.scrollX) + 'px';
+        tip.style.top = (r.top + window.scrollY - 6) + 'px';
+        tip.style.opacity = '1';
+      });
+      el.addEventListener('mouseleave', () => tip.style.opacity = '0');
+    });
+  }
+
+  // ---- orchestration ----
+  async function loadAll() {
+    setBanner('', '');
+    try {
+      const [liveOv, liveOf] = await Promise.all([loadOverview(), loadOffers(), loadHistory(), loadEarnings()]).then(r => [r[0], r[1]]);
+      const anyLive = (liveOv && liveOv.available) || (liveOf && liveOf.available);
+      if (anyLive) setConn('ok', 'Bitfinex 即時連線正常');
+      else setConn('off', '離線（僅顯示本地帳本記錄）');
+    } catch (err) {
+      setConn('err', '載入失敗');
+      setBanner('err', '讀取資料失敗：' + err.message);
+    }
+  }
+  document.getElementById('refreshBtn').addEventListener('click', loadAll);
+
+  (async function init() {
+    try {
+      await loadProfiles();
+      if (!currentProfile) { setBanner('warn', '尚未設定任何帳戶 profile。'); return; }
+      await loadAll();
+    } catch (err) {
+      setBanner('err', '初始化失敗：' + err.message);
+    }
+  })();
+})();
+</script>
+</body>
+</html>

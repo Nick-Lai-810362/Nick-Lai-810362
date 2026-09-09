@@ -22,6 +22,13 @@ python tsgex_bitfinex_lending_bot.py --export-csv history.csv --export-tenor 30
 
 # Actually place live orders (only after reviewing dry-run output)
 python tsgex_bitfinex_lending_bot.py --live --mode dave_high
+
+# Local web dashboard: asset overview, open orders, lending history, realized
+# + annualized returns, and (via --profiles-file) switching between several
+# Bitfinex accounts each with their own API key. Try it with zero API keys:
+python tsgex_bitfinex_dashboard.py --mock
+# then open http://127.0.0.1:8765/. With a real account, export the same
+# BFX_API_KEY/BFX_API_SECRET env vars the bot uses and drop --mock.
 ```
 
 Run the test suite with `pytest` from this directory (or anywhere, since
@@ -31,6 +38,7 @@ Run the test suite with `pytest` from this directory (or anywhere, since
 
 ```
 tsgex_bitfinex_lending_bot.py   Thin CLI entry point (configures logging, calls cli.main())
+tsgex_bitfinex_dashboard.py     Thin entry point for the local web dashboard (calls webapp.main())
 
 tsgex_bfx_bot/
   constants.py     Real-data-derived numbers: reference tenors, per-tenor
@@ -55,12 +63,46 @@ tsgex_bfx_bot/
                     cancel+relist)
   runner.py        run_cycle() -- wires the above into one strategy cycle
   cli.py           argparse + main()
+  analytics.py     overview(), open_offers(), history(), earnings(), apr() --
+                    pure functions over BotState powering the dashboard
+  profiles.py      Profile/load_profiles()/find_profile() -- multi-sub-
+                    account config for webapp.py (each profile names its OWN
+                    env vars; credentials are never stored in the config file)
+  webapp.py        Local (127.0.0.1-only) HTTP server: same-origin JSON API
+                    (analytics.py + live BitfinexClient calls, each wrapped
+                    to degrade to "local ledger only" on any failure) +
+                    serves webapp_static/dashboard.html
+  webapp_static/
+    dashboard.html Multi-tab dashboard SPA (資產總覽/掛單詳情/出借歷史紀錄/
+                    收益與年化報酬), vanilla JS, no external dependencies
 
 tests/             pytest suite, one file per module + test_integration.py
                     for end-to-end regression coverage (several tests encode
                     real bugs found during development -- see their
-                    docstrings and CHANGELOG.md)
+                    docstrings and CHANGELOG.md) + test_webapp.py, which
+                    spins up a real DashboardHandler on a real socket and
+                    hits every route with urllib
 ```
+
+### Why the dashboard is a local server, not a claude.ai Artifact
+
+An Artifact page's sandbox blocks browser-side `fetch`/`XHR` to any host
+outside a small CDN allowlist -- `api.bitfinex.com` isn't on it, so a
+browser-only Artifact page cannot call the live Bitfinex API at all (a hard
+platform constraint, not a design choice). Calling the real, authenticated
+API needs a real backend making the signed HTTP request server-side --
+`webapp.py` is exactly that: a plain Python `http.server` (stdlib only) that
+serves the dashboard and a same-origin JSON API backed by `client.py`. Every
+view also works fully offline from the bot's own local ledger file when no
+API key is configured or Bitfinex is unreachable; live exchange data (wallet
+balance, live open-offer count) is an optional overlay on top. See
+`tsgex_bfx_bot/webapp.py`'s module docstring for the full reasoning.
+
+There is also a simpler, `claude.ai`-hosted Artifact
+(`reports/TSGEX_Bitfinex_Bot_Dashboard.html`) for quickly eyeballing an
+exported CSV without running anything locally -- it has no live-API or
+multi-account features for the reason above, just position-history charts
+and filtering.
 
 ## Data flow of one cycle (`runner.run_cycle`)
 

@@ -48,6 +48,11 @@ def build_arg_parser() -> argparse.ArgumentParser:
     ap.add_argument("--rate-drift-threshold-pp", type=float, default=0.01,
                      help="Cancel+relist a pending order if the live net-APR at its tenor has moved "
                           "away from its quoted rate by at least this much (0.01=1pp).")
+    ap.add_argument("--enable-spike-reserve", action="store_true",
+                     help="dave_high mode only. DEFAULT OFF: a real backtest against 5 years of real "
+                          "fUSD rate data found this signal's assumed direction is empirically backwards "
+                          "(momentum-up predicts a subsequent DECLINE, not a rise -- see CHANGELOG.md "
+                          "'v5.1'). Only enable if you've independently validated a signal you trust.")
     ap.add_argument("--order-visibility", choices=["standard", "hidden"], default="standard")
     ap.add_argument("--state-file", default="bfx_bot_state.json")
     ap.add_argument("--contribute", type=float, default=0.0)
@@ -70,6 +75,7 @@ def config_from_args(args: argparse.Namespace) -> StrategyConfig:
         term_premium_min_pp=args.term_premium_min_pp, authorize_extreme_tenor=args.authorize_extreme_tenor,
         barbell_short_fraction=args.barbell_short_fraction, max_orders_per_cycle=args.max_orders_per_cycle,
         max_wait_multiplier=args.max_wait_multiplier, rate_drift_threshold_pp=args.rate_drift_threshold_pp,
+        enable_spike_reserve=args.enable_spike_reserve,
         order_visibility=args.order_visibility, state_path=args.state_file, audit_log_path=args.audit_log or None,
     )
 

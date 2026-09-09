@@ -120,6 +120,39 @@ def test_barbell_mode_splits_between_two_distinct_tenors_when_premium_exists():
     assert 2 in tenors_used  # short bucket is always used
 
 
+def test_spike_reserve_disabled_by_default():
+    """Regression: a real backtest against 5 years of real fUSD hourly rate
+    data (CHANGELOG.md 'v5.1') found the spike-proxy signal's assumed
+    direction is empirically backwards -- momentum-up predicts a subsequent
+    rate DECLINE, not a rise. enable_spike_reserve must default to False so
+    dave_high mode never silently acts on a signal shown to point the wrong
+    way; capital allocation with the signal firing must be unaffected."""
+    cfg = StrategyConfig(mode="dave_high", state_path="/tmp/_never_used7.json", audit_log_path=None)
+    assert cfg.enable_spike_reserve is False
+
+    state_reserve_off = BotState()
+    contribute_principal(state_reserve_off, 10_000.0)
+    client = MockBitfinexClient()
+    now = datetime(2026, 9, 9, tzinfo=timezone.utc)
+    rate_history = [0.05] * 20 + [0.20] * 6  # force spike_signal True
+    run_cycle(client, cfg, state_reserve_off, rate_history, now, live=False)
+    committed = sum(p.amount for p in state_reserve_off.positions)
+    assert committed == pytest.approx(10_000.0, rel=1e-6)  # nothing held back
+
+
+def test_spike_reserve_can_be_explicitly_enabled():
+    cfg = dataclasses.replace(StrategyConfig(mode="dave_high", state_path="/tmp/_never_used8.json",
+                                              audit_log_path=None), enable_spike_reserve=True)
+    state = BotState()
+    contribute_principal(state, 10_000.0)
+    client = MockBitfinexClient()
+    now = datetime(2026, 9, 9, tzinfo=timezone.utc)
+    rate_history = [0.05] * 20 + [0.20] * 6  # force spike_signal True
+    run_cycle(client, cfg, state, rate_history, now, live=False)
+    committed = sum(p.amount for p in state.positions)
+    assert committed == pytest.approx(10_000.0 * (1 - cfg.fbrr_reserve_fraction), rel=1e-6)
+
+
 def test_dave_fast_places_exactly_one_tranche():
     cfg = StrategyConfig(mode="dave_fast", state_path="/tmp/_never_used6.json", audit_log_path=None)
     state = BotState()

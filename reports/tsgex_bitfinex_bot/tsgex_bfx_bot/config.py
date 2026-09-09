@@ -41,7 +41,16 @@ class StrategyConfig:
     max_wait_multiplier: float = 1.0
     rate_drift_threshold_pp: float = 0.01
 
-    # FBRR / Dave-High reserve behavior: disclosed proxy signal, not Fuly's real model
+    # FBRR / Dave-High reserve behavior: disclosed proxy signal, not Fuly's real model.
+    # DEFAULT OFF -- a real backtest against 5 years of real fUSD hourly rate
+    # data (see CHANGELOG.md "v5.1") found this signal's assumed direction is
+    # empirically BACKWARDS: when it fires (fast MA > slow MA, i.e. recent
+    # upward momentum), the rate subsequently DECLINES on average (-0.7 to
+    # -1.0pp over the next 24h/7d, n>11,000, consistent both in-sample and
+    # out-of-sample), not rises as the "reserve capital for an anticipated
+    # increase" logic assumes. Enable only if you've independently validated
+    # a signal you trust -- see enable_spike_reserve.
+    enable_spike_reserve: bool = False
     spike_fast_window: int = 6
     spike_slow_window: int = 24
     fbrr_reserve_fraction: float = 0.15

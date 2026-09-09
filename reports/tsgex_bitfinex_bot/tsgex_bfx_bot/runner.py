@@ -109,11 +109,14 @@ def run_cycle(client: BitfinexClient, cfg: StrategyConfig, state: BotState, rate
             for amount, rate in build_tranches_for_tenor(long_cap, tenor_rates[long_tenor], long_tenor, cfg):
                 placed_records.append(place_tranche(client, cfg, state, now, live, amount, rate, long_tenor, "[long]"))
     else:  # custom / dave_high -- full adaptive multi-tenor allocation
-        if cfg.mode == "dave_high" and spike:
+        if cfg.mode == "dave_high" and cfg.enable_spike_reserve and spike:
             reserve_now = lendable * cfg.fbrr_reserve_fraction
             lendable -= reserve_now
             reasoning.append(f"spike-proxy fired -> reserving {reserve_now:,.2f} "
                               f"({cfg.fbrr_reserve_fraction:.0%}) for an anticipated rate increase")
+        elif cfg.mode == "dave_high" and spike:
+            reasoning.append("spike-proxy fired but enable_spike_reserve=False (default) -- backtest showed "
+                              "this signal's assumed direction is empirically backwards, see CHANGELOG.md")
         allocation = decide_tenor_allocation(tenor_rates, cfg)
         reasoning.append("tenor allocation: " + ", ".join(f"{t}d={w:.0%}" for t, w in sorted(allocation.items())))
         for tenor, weight in allocation.items():

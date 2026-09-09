@@ -1,5 +1,57 @@
 # Changelog
 
+## v5.1 (real backtest of the spike signal and term-premium persistence -- `enable_spike_reserve` now defaults False)
+
+The user asked for the FBRR-style prediction question to actually be
+answered, not just built around, using the real 5-year hourly p2/p30/p120
+rate data already collected (this sandbox cannot reach the Bitfinex API
+directly -- see `research/backtest_spike_and_premium.py` for the script and
+`research/backtest_results_2026-09-09.txt` for the raw output). Same
+standard as the earlier BTC technical-analysis study in this project:
+chronological split-half (fit on the first half, confirm on the held-out
+second half), compared against a naive "no change" baseline, negative
+results reported as plainly as positive ones.
+
+**Finding 1 (acted on): the spike-proxy signal's assumed direction is
+empirically backwards.** `compute_spike_signal` (fast MA(6) > slow MA(24))
+fires when the rate has recent upward momentum; `dave_high` mode's design
+assumed that meant "reserve capital, a further rate increase is coming."
+Tested against 5 years of real hourly data (n>11,000 per bucket, both
+in-sample and out-of-sample): when the signal fires, the rate's mean
+forward change over the next 24h/7d is **-0.7 to -1.0 percentage points**
+(a decline); when it doesn't fire, the mean forward change is **+0.6 to
++0.8pp** (a rise) -- the opposite of what the reserve logic assumes, and
+consistent across both halves of the data (not an in-sample artifact). This
+mirrors the earlier BTC finding that simple momentum/trend heuristics don't
+have real exploitable edge in this kind of market -- here the effect isn't
+even edge-less, it points the wrong way. **Action taken:** added
+`StrategyConfig.enable_spike_reserve` (default `False`) gating the reserve
+behavior; `dave_high` mode no longer silently reserves capital on this
+signal unless explicitly re-enabled with `--enable-spike-reserve`, which
+now carries an explicit warning about this finding. Not inverted into a new
+"fade the signal" bet -- a mean-reversion effect existing in aggregate
+(Test 1) did NOT translate into a useful point forecast (Test 3: using it
+to predict the future rate level was 2-5% WORSE than assuming no change at
+all), so the honest, appropriately cautious response is to disable the
+heuristic, not to flip it into an unvalidated opposite strategy.
+
+**Finding 2 (noted, no code change): the term premium's persistence is
+real but weaker than the in-sample numbers alone suggest.** The correlation
+between the currently observed 2d->30d premium and the premium N days later
+is positive but decays sharply out-of-sample (e.g. at the 7-day horizon:
++0.143 in-sample vs +0.038 out-of-sample) -- a classic sign of an unstable
+relationship, likely reflecting a few slow-moving multi-year regimes in the
+5-year window rather than a stable, exploitable pattern. Practically. the
+gap between "premium now >= the bot's 2pp threshold" and "premium now <
+2pp" in predicting the *future* premium is modest out-of-sample (+3.80pp vs
++3.23pp at 7 days) -- real, but nowhere near as clean a separation as the
+in-sample numbers (+6.96pp vs +5.19pp) implied. This does NOT invalidate
+`decide_tenor_allocation`'s design: it was always framed as reading the
+CURRENTLY available rate at each tenor, not forecasting where the premium
+is heading (see v4 finding #3) -- that framing turns out to be the right
+level of humility, since the data doesn't support treating the premium as
+strongly predictive of anything beyond itself right now.
+
 ## v5.0.0 (this modularization)
 
 Reorganized the single-file v5 script into the `tsgex_bfx_bot/` package

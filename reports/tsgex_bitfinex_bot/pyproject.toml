@@ -1,0 +1,9 @@
+[project]
+name = "tsgex-bfx-bot"
+version = "5.0.0"
+description = "TSGEX Bitfinex USD Margin Funding Automation Bot"
+requires-python = ">=3.8"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

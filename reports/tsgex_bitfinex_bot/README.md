@@ -98,11 +98,15 @@ API key is configured or Bitfinex is unreachable; live exchange data (wallet
 balance, live open-offer count) is an optional overlay on top. See
 `tsgex_bfx_bot/webapp.py`'s module docstring for the full reasoning.
 
-There is also a simpler, `claude.ai`-hosted Artifact
-(`reports/TSGEX_Bitfinex_Bot_Dashboard.html`) for quickly eyeballing an
-exported CSV without running anything locally -- it has no live-API or
-multi-account features for the reason above, just position-history charts
-and filtering.
+There is also a `claude.ai`-hosted Artifact
+(`reports/TSGEX_Bitfinex_Bot_Dashboard.html`) for browsing a ledger without
+running anything locally -- same four tabs as the local dashboard (資產總覽/
+掛單詳情/出借歷史紀錄/收益與年化報酬), computed by a JS port of `analytics.py`
+against an uploaded `bfx_bot_state.json` (preferred, gives the full picture)
+or a legacy `--export-csv` file (positions only -- principal/idle totals show
+as unavailable). It opens pre-loaded with clearly-labeled example data rather
+than an empty shell. It still has no live-API or multi-account switching, for
+the CSP reason above.
 
 ## Data flow of one cycle (`runner.run_cycle`)
 

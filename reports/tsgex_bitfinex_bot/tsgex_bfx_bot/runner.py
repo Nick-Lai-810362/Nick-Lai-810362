@@ -17,6 +17,7 @@ from .strategy import (
     build_tranches_for_tenor,
     compute_spike_signal,
     decide_tenor_allocation,
+    depth_by_tenor,
 )
 from .audit import write_audit_log
 
@@ -40,9 +41,10 @@ def run_cycle(client: BitfinexClient, cfg: StrategyConfig, state: BotState, rate
         return
 
     tenor_rates = best_rate_by_tenor(book)
+    depth = depth_by_tenor(book)
     if not tenor_rates:
-        log.warning("No quotes at target tenors (2/7/30d), skipping cycle")
-        write_audit_log(cfg, {"mode": cfg.mode, "action": "skip", "reason": "no_target_tenor_quotes"})
+        log.warning("No quotes in the funding book, skipping cycle")
+        write_audit_log(cfg, {"mode": cfg.mode, "action": "skip", "reason": "no_tenor_quotes"})
         save_state(state, cfg.state_path)
         return
 
@@ -98,7 +100,8 @@ def run_cycle(client: BitfinexClient, cfg: StrategyConfig, state: BotState, rate
         placed_records.append(place_tranche(client, cfg, state, now, live, lendable, tenor_rates[short_tenor], short_tenor))
         reasoning.append(f"Dave Fast: single tranche, most liquid tenor ({short_tenor}d)")
     elif cfg.mode == "barbell":
-        long_tenor = max([t for t in tenor_rates if t != short_tenor and t <= 30], default=short_tenor)
+        long_tenor = max([t for t in tenor_rates if t != short_tenor and t <= 30
+                           and depth.get(t, 0.0) >= cfg.min_period_depth_usd], default=short_tenor)
         short_cap = lendable * cfg.barbell_short_fraction
         long_cap = lendable - short_cap
         reasoning.append(f"barbell: {cfg.barbell_short_fraction:.0%} @ {short_tenor}d / "
@@ -109,12 +112,15 @@ def run_cycle(client: BitfinexClient, cfg: StrategyConfig, state: BotState, rate
             for amount, rate in build_tranches_for_tenor(long_cap, tenor_rates[long_tenor], long_tenor, cfg):
                 placed_records.append(place_tranche(client, cfg, state, now, live, amount, rate, long_tenor, "[long]"))
     else:  # custom / dave_high -- full adaptive multi-tenor allocation
-        if cfg.mode == "dave_high" and spike:
+        if cfg.mode == "dave_high" and cfg.enable_spike_reserve and spike:
             reserve_now = lendable * cfg.fbrr_reserve_fraction
             lendable -= reserve_now
             reasoning.append(f"spike-proxy fired -> reserving {reserve_now:,.2f} "
                               f"({cfg.fbrr_reserve_fraction:.0%}) for an anticipated rate increase")
-        allocation = decide_tenor_allocation(tenor_rates, cfg)
+        elif cfg.mode == "dave_high" and spike:
+            reasoning.append("spike-proxy fired but enable_spike_reserve=False (default) -- backtest showed "
+                              "this signal's assumed direction is empirically backwards, see CHANGELOG.md")
+        allocation = decide_tenor_allocation(tenor_rates, cfg, depth=depth)
         reasoning.append("tenor allocation: " + ", ".join(f"{t}d={w:.0%}" for t, w in sorted(allocation.items())))
         for tenor, weight in allocation.items():
             bucket_capital = lendable * weight

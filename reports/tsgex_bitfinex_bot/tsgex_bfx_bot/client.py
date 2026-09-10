@@ -51,6 +51,25 @@ class BitfinexClient:
     def get_active_funding_offers(self, symbol: str):
         return self._signed_post(f"auth/r/funding/offers/{symbol}", {})
 
+    def get_wallet_balances(self):
+        """[[WALLET_TYPE, CURRENCY, BALANCE, UNSETTLED_INTEREST, BALANCE_AVAILABLE, ...], ...]
+        per docs.bitfinex.com/reference/rest-auth-wallets. Only needs read scope on
+        "wallets" -- governance.assert_minimal_permissions already only blocks WRITE
+        scope on that permission, so this is safe under the funding-only key policy.
+        NOT verified against a live call (network egress to Bitfinex is blocked in the
+        sandbox this bot was developed in) -- cross-check the parsed values against the
+        Bitfinex UI before relying on them, same caveat as extract_offer_id()."""
+        return self._signed_post("auth/r/wallets", {})
+
+    def get_funding_loans_history(self, symbol: str, limit: int = 200):
+        """Exchange-side record of past funding loans (offers that were taken and have
+        since closed) for `symbol`, per docs.bitfinex.com/reference/rest-auth-funding-loans-hist.
+        Used as an optional live cross-check against this bot's own local ledger, which
+        remains the authoritative record for principal/profit accounting -- this bot may
+        not be the only thing lending on the account. NOT verified against a live call,
+        same caveat as get_wallet_balances()."""
+        return self._signed_post(f"auth/r/funding/loans/{symbol}/hist", {"limit": limit})
+
     def submit_funding_offer(self, symbol: str, amount: float, daily_rate: float, period_days: int):
         """
         daily_rate: the DAILY interest rate (annualized_rate ~= daily_rate * 365).

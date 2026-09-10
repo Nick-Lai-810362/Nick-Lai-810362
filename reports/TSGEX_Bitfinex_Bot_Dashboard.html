@@ -1,483 +1,655 @@
-<title>Funding Bot Dashboard</title>
+<title>放貸機器人帳本</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,440;9..144,600;9..144,680&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
 <style>
-.viz-root {
-  color-scheme: light;
-  --surface-1:      #fcfcfb;
-  --page-plane:     #f9f9f7;
-  --text-primary:   #0b0b0b;
-  --text-secondary: #52514e;
-  --text-muted:     #898781;
-  --gridline:       #e1e0d9;
-  --baseline:       #c3c2b7;
-  --border:         rgba(11,11,11,0.10);
-  --success-text:   #006300;
-  --series-1:       #2a78d6; /* 2d */
-  --series-2:       #eb6834; /* 7d */
-  --series-3:       #1baf7a; /* 30d */
-  --series-4:       #eda100; /* 120d */
-  --card-bg:        #ffffff;
-}
-@media (prefers-color-scheme: dark) {
-  :root:where(:not([data-theme="light"])) .viz-root {
-    color-scheme: dark;
-    --surface-1:      #1a1a19;
-    --page-plane:     #0d0d0d;
-    --text-primary:   #ffffff;
-    --text-secondary: #c3c2b7;
-    --text-muted:     #898781;
-    --gridline:       #2c2c2a;
-    --baseline:       #383835;
-    --border:         rgba(255,255,255,0.10);
-    --success-text:   #0ca30c;
-    --series-1:       #3987e5;
-    --series-2:       #d95926;
-    --series-3:       #199e70;
-    --series-4:       #c98500;
-    --card-bg:        #232322;
+  :root {
+    --bg: #f2f4f0;
+    --surface: #ffffff;
+    --surface-2: #eaece6;
+    --ink: #12201b;
+    --ink-2: #4a564e;
+    --ink-3: #818d84;
+    --border: rgba(18,32,27,0.12);
+    --border-strong: rgba(18,32,27,0.22);
+    --accent: #1f6f57;
+    --accent-ink: #0f4536;
+    --accent-soft: rgba(31,111,87,0.12);
+    --pending: #a8721f;
+    --pending-soft: rgba(168,114,31,0.14);
+    --danger: #a1403d;
+    --danger-soft: rgba(161,64,61,0.13);
+    --cancelled: #818d84;
+    --cancelled-soft: rgba(129,141,132,0.15);
+    --tenor-1: #1f6f57;
+    --tenor-2: #3d6fa8;
+    --tenor-3: #a8721f;
+    --tenor-4: #7a4fa1;
+    --shadow: 0 1px 2px rgba(18,32,27,0.05), 0 6px 20px -8px rgba(18,32,27,0.12);
   }
-}
-:root[data-theme="dark"] .viz-root {
-  color-scheme: dark;
-  --surface-1:      #1a1a19;
-  --page-plane:     #0d0d0d;
-  --text-primary:   #ffffff;
-  --text-secondary: #c3c2b7;
-  --text-muted:     #898781;
-  --gridline:       #2c2c2a;
-  --baseline:       #383835;
-  --border:         rgba(255,255,255,0.10);
-  --success-text:   #0ca30c;
-  --series-1:       #3987e5;
-  --series-2:       #d95926;
-  --series-3:       #199e70;
-  --series-4:       #c98500;
-  --card-bg:        #232322;
-}
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0d1512;
+      --surface: #151f1a;
+      --surface-2: #1b2620;
+      --ink: #eef2ee;
+      --ink-2: #b7c2ba;
+      --ink-3: #7c8880;
+      --border: rgba(238,242,238,0.12);
+      --border-strong: rgba(238,242,238,0.22);
+      --accent: #4fd8a8;
+      --accent-ink: #bff2dd;
+      --accent-soft: rgba(79,216,168,0.16);
+      --pending: #e0a94c;
+      --pending-soft: rgba(224,169,76,0.16);
+      --danger: #e2827e;
+      --danger-soft: rgba(226,130,126,0.15);
+      --cancelled: #8b978f;
+      --cancelled-soft: rgba(139,151,143,0.16);
+      --tenor-1: #4fd8a8;
+      --tenor-2: #7fb0e8;
+      --tenor-3: #e0a94c;
+      --tenor-4: #b992e8;
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 10px 28px -10px rgba(0,0,0,0.5);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0d1512; --surface: #151f1a; --surface-2: #1b2620;
+    --ink: #eef2ee; --ink-2: #b7c2ba; --ink-3: #7c8880;
+    --border: rgba(238,242,238,0.12); --border-strong: rgba(238,242,238,0.22);
+    --accent: #4fd8a8; --accent-ink: #bff2dd; --accent-soft: rgba(79,216,168,0.16);
+    --pending: #e0a94c; --pending-soft: rgba(224,169,76,0.16);
+    --danger: #e2827e; --danger-soft: rgba(226,130,126,0.15);
+    --cancelled: #8b978f; --cancelled-soft: rgba(139,151,143,0.16);
+    --tenor-1: #4fd8a8; --tenor-2: #7fb0e8; --tenor-3: #e0a94c; --tenor-4: #b992e8;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 10px 28px -10px rgba(0,0,0,0.5);
+  }
 
-* { box-sizing: border-box; }
-body { background: var(--page-plane); }
-.viz-root {
-  background: var(--page-plane);
-  color: var(--text-primary);
-  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
-  padding: 24px 20px 60px;
-  max-width: 1180px;
-  margin: 0 auto;
-}
-h1 { font-size: 20px; font-weight: 700; margin: 0 0 4px; }
-.subtitle { color: var(--text-secondary); font-size: 13px; margin: 0 0 20px; }
+  * { box-sizing: border-box; }
+  .ledger-root {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", -apple-system, "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+    padding: 28px 24px 80px;
+    max-width: 1220px;
+    margin: 0 auto;
+  }
+  .num { font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace; font-variant-numeric: tabular-nums; }
+  .display { font-family: "Fraunces", Georgia, "Noto Serif TC", serif; }
 
-.panel {
-  background: var(--surface-1);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 16px 18px;
-  margin-bottom: 16px;
-}
-.panel h2 { font-size: 14px; font-weight: 600; margin: 0 0 12px; color: var(--text-primary); }
+  header.top {
+    display: flex; align-items: flex-end; justify-content: space-between; gap: 20px;
+    flex-wrap: wrap; padding-bottom: 18px; border-bottom: 1.5px solid var(--border-strong); margin-bottom: 22px;
+  }
+  header.top .title-block h1 {
+    font-family: "Fraunces", Georgia, "Noto Serif TC", serif;
+    font-weight: 680; font-size: 27px; letter-spacing: -0.01em; margin: 0 0 5px; text-wrap: balance;
+  }
+  header.top .title-block p { margin: 0; font-size: 13px; color: var(--ink-2); max-width: 60ch; }
+  .data-source {
+    display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--ink-2);
+  }
+  .data-source .badge {
+    font-family: "IBM Plex Mono", monospace; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em;
+    padding: 3px 9px; border-radius: 999px; background: var(--pending-soft); color: var(--pending); font-weight: 600;
+  }
+  .data-source .badge.real { background: var(--accent-soft); color: var(--accent-ink); }
+  .upload-btn {
+    font-family: "IBM Plex Sans", sans-serif; font-size: 12.5px; font-weight: 500; padding: 7px 14px;
+    border-radius: 7px; border: 1px solid var(--border-strong); background: var(--surface); color: var(--ink);
+    cursor: pointer; white-space: nowrap;
+  }
+  .upload-btn:hover { border-color: var(--accent); color: var(--accent-ink); }
+  input[type=file] { display: none; }
 
-.upload-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-input[type=file] { font-size: 13px; color: var(--text-secondary); }
-.hint { font-size: 12px; color: var(--text-muted); }
+  nav.tabs { display: flex; gap: 2px; margin-bottom: 22px; border-bottom: 1px solid var(--border); overflow-x: auto; }
+  nav.tabs button {
+    font-family: "IBM Plex Sans", sans-serif; font-size: 13.5px; font-weight: 500; color: var(--ink-3);
+    background: none; border: none; border-bottom: 2.5px solid transparent; padding: 10px 16px 12px; cursor: pointer;
+    white-space: nowrap;
+  }
+  nav.tabs button.active { color: var(--accent-ink); border-bottom-color: var(--accent); font-weight: 600; }
+  nav.tabs button:hover:not(.active) { color: var(--ink); }
 
-.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
-.card {
-  background: var(--card-bg);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 12px 14px;
-}
-.card .label { font-size: 12px; color: var(--text-muted); margin-bottom: 4px; }
-.card .value { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
-.card .value.profit { color: var(--success-text); }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; animation: fade .18s ease; }
+  @keyframes fade { from { opacity: 0; transform: translateY(2px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) { .tab-panel.active { animation: none; } }
 
-.filters { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
-.filter-field { display: flex; flex-direction: column; gap: 4px; }
-.filter-field label { font-size: 11px; color: var(--text-muted); }
-.filter-field select, .filter-field input[type=date] {
-  font-size: 13px; padding: 6px 8px; border-radius: 6px; border: 1px solid var(--border);
-  background: var(--card-bg); color: var(--text-primary);
-}
-button.primary {
-  font-size: 13px; padding: 7px 14px; border-radius: 6px; border: none;
-  background: var(--series-1); color: #fff; cursor: pointer; font-weight: 600;
-}
-button.primary:disabled { opacity: 0.45; cursor: not-allowed; }
-button.primary:hover:not(:disabled) { filter: brightness(1.08); }
+  section.panel {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    padding: 18px 20px 20px; margin-bottom: 16px; box-shadow: var(--shadow);
+  }
+  .eyebrow {
+    font-family: "IBM Plex Mono", monospace; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.09em;
+    color: var(--ink-3); margin: 0 0 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  }
+  .eyebrow .hint { text-transform: none; letter-spacing: 0; font-size: 11.5px; color: var(--ink-3); }
 
-.chart-grid { display: grid; grid-template-columns: 1.4fr 1fr; gap: 16px; }
-@media (max-width: 760px) { .chart-grid { grid-template-columns: 1fr; } }
-.chart-empty { color: var(--text-muted); font-size: 13px; padding: 40px 0; text-align: center; }
-.legend { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 8px; font-size: 12px; color: var(--text-secondary); }
-.legend .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(168px, 1fr)); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  .tile { background: var(--surface); padding: 14px 16px; border-left: 3px solid transparent; }
+  .tile.rail-ink { border-left-color: var(--ink-3); }
+  .tile.rail-profit { border-left-color: var(--accent); }
+  .tile.rail-pending { border-left-color: var(--pending); }
+  .tile .label { font-size: 11px; color: var(--ink-3); margin-bottom: 6px; }
+  .tile .value { font-family: "IBM Plex Mono", monospace; font-size: 19px; font-weight: 600; letter-spacing: -0.01em; }
+  .tile .value.profit { color: var(--accent-ink); }
+  .tile .sub { font-size: 10.5px; color: var(--ink-3); margin-top: 4px; }
+  .tile.dim .value, .tile.dim .label { color: var(--ink-3); }
 
-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
-thead th {
-  text-align: left; font-weight: 600; color: var(--text-muted); font-size: 11px;
-  text-transform: uppercase; letter-spacing: 0.02em; padding: 6px 8px; border-bottom: 1px solid var(--gridline);
-  position: sticky; top: 0; background: var(--surface-1);
-}
-tbody td { padding: 6px 8px; border-bottom: 1px solid var(--gridline); font-variant-numeric: tabular-nums; white-space: nowrap; }
-tbody tr:hover { background: var(--page-plane); }
-.status-pill { font-size: 11px; padding: 1px 8px; border-radius: 999px; font-weight: 600; }
-.status-active { background: color-mix(in srgb, var(--series-1) 18%, transparent); color: var(--series-1); }
-.status-matured { background: color-mix(in srgb, var(--success-text) 16%, transparent); color: var(--success-text); }
-.status-pending { background: color-mix(in srgb, var(--series-4) 20%, transparent); color: var(--series-4); }
-.status-cancelled { background: color-mix(in srgb, var(--text-muted) 20%, transparent); color: var(--text-muted); }
-.table-scroll { max-height: 420px; overflow: auto; border: 1px solid var(--border); border-radius: 8px; }
-.row-count { font-size: 12px; color: var(--text-muted); margin-top: 8px; }
+  .filters { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 14px; }
+  .ff { display: flex; flex-direction: column; gap: 4px; }
+  .ff label { font-size: 10.5px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.04em; }
+  select, input[type=date] {
+    font-family: "IBM Plex Sans", sans-serif; font-size: 12.5px; padding: 6px 9px; border-radius: 6px;
+    border: 1px solid var(--border-strong); background: var(--bg); color: var(--ink);
+  }
+  button.action {
+    font-family: "IBM Plex Sans", sans-serif; font-size: 12.5px; font-weight: 600; padding: 7px 14px;
+    border-radius: 7px; border: 1px solid var(--accent); background: var(--accent); color: #fff; cursor: pointer;
+  }
+  button.action:hover { filter: brightness(1.08); }
+  button.ghost {
+    font-family: "IBM Plex Sans", sans-serif; font-size: 12.5px; padding: 7px 14px; border-radius: 7px;
+    border: 1px solid var(--border-strong); background: var(--surface); color: var(--ink); cursor: pointer;
+  }
+  button.ghost:hover { border-color: var(--accent); }
 
-.tooltip {
-  position: absolute; pointer-events: none; background: var(--text-primary); color: var(--surface-1);
-  font-size: 11px; padding: 5px 8px; border-radius: 5px; white-space: nowrap; opacity: 0; transition: opacity .1s;
-  z-index: 10; transform: translate(-50%, -100%);
-}
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; }
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; min-width: 720px; }
+  thead th {
+    text-align: left; font-family: "IBM Plex Mono", monospace; font-weight: 600; color: var(--ink-3);
+    font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.04em; padding: 8px 10px;
+    border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--surface-2); white-space: nowrap;
+  }
+  tbody td { padding: 7px 10px; border-bottom: 1px solid var(--border); font-family: "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  tbody tr:hover { background: var(--surface-2); }
+  .table-wrap { max-height: 440px; overflow-y: auto; }
+  .pill { font-family: "IBM Plex Sans", sans-serif; font-size: 10.5px; padding: 2px 9px; border-radius: 999px; font-weight: 600; }
+  .pill.pending { background: var(--pending-soft); color: var(--pending); }
+  .pill.active { background: var(--accent-soft); color: var(--accent-ink); }
+  .pill.matured { background: var(--accent-soft); color: var(--accent-ink); }
+  .pill.cancelled { background: var(--cancelled-soft); color: var(--ink-3); }
+  .row-count { font-size: 11.5px; color: var(--ink-3); margin-top: 8px; }
+
+  .chart-grid { display: grid; grid-template-columns: 1.35fr 1fr; gap: 16px; }
+  @media (max-width: 780px) { .chart-grid { grid-template-columns: 1fr; } }
+  .chart-title { font-size: 12px; color: var(--ink-2); margin-bottom: 8px; font-weight: 500; }
+  .chart-empty { color: var(--ink-3); font-size: 12.5px; padding: 50px 0; text-align: center; }
+
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 10px; font-size: 11px; color: var(--ink-2); }
+  .legend .swatch { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+
+  .tooltip {
+    position: absolute; pointer-events: none; background: var(--ink); color: var(--bg);
+    font-family: "IBM Plex Mono", monospace; font-size: 11px; padding: 5px 9px; border-radius: 5px;
+    white-space: nowrap; opacity: 0; transition: opacity .1s; z-index: 20; transform: translate(-50%,-100%);
+  }
+  @media (max-width: 460px) { .ledger-root { padding: 20px 14px 70px; } header.top { flex-direction: column; align-items: flex-start; } }
 </style>
 
-<div class="viz-root">
-  <h1>放貸機器人儀表板</h1>
-  <p class="subtitle">載入 TSGEX_Bitfinex_Funding_Bot.py 用 --export-csv 匯出的部位紀錄，篩選天期/日期範圍查看細節，並可下載篩選後的 CSV</p>
-
-  <div class="panel">
-    <div class="upload-row">
-      <input type="file" id="fileInput" accept=".csv" />
-      <span class="hint" id="fileHint">尚未載入檔案</span>
+<div class="ledger-root">
+  <header class="top">
+    <div class="title-block">
+      <h1>放貸機器人帳本</h1>
+      <p>資產總覽、掛單詳情、出借歷史紀錄與收益／年化報酬 — 讀取 <span class="num">bfx_bot_state.json</span>（建議，含完整本金/利潤帳本）或舊版 <span class="num">--export-csv</span> 匯出檔。</p>
     </div>
+    <div class="data-source">
+      <span class="badge" id="sourceBadge">範例資料</span>
+      <span id="sourceLabel">目前顯示的是示範用途的模擬資料</span>
+      <label class="upload-btn" for="fileInput">上傳檔案</label>
+      <input type="file" id="fileInput" accept=".json,.csv" />
+    </div>
+  </header>
+
+  <nav class="tabs" id="tabNav">
+    <button data-tab="overview" class="active">資產總覽</button>
+    <button data-tab="offers">掛單詳情</button>
+    <button data-tab="history">出借歷史紀錄</button>
+    <button data-tab="earnings">收益與年化報酬</button>
+  </nav>
+
+  <div class="tab-panel active" id="tab-overview">
+    <section class="panel">
+      <p class="eyebrow">本金與資金狀態</p>
+      <div class="tiles" id="overviewTiles"></div>
+    </section>
+    <section class="panel">
+      <p class="eyebrow">資金配置<span class="hint">閒置 vs. 使用中 vs. 等待成交中</span></p>
+      <div id="allocationBar"></div>
+      <div class="legend" id="allocationLegend"></div>
+    </section>
   </div>
 
-  <div id="dashboardBody" hidden>
-    <div class="panel">
-      <h2>總覽</h2>
-      <div class="cards" id="summaryCards"></div>
-      <div class="hint" style="margin-top:10px;">等待成交中的部位金額已從本金/利潤池扣除（下單當下即視為已投入），但尚未開始計息</div>
-    </div>
+  <div class="tab-panel" id="tab-offers">
+    <section class="panel">
+      <p class="eyebrow">目前掛單 <span class="hint" id="offersHint"></span></p>
+      <div class="table-scroll"><div class="table-wrap">
+        <table>
+          <thead><tr><th>狀態</th><th>天期</th><th>金額</th><th>日利率</th><th>毛年化</th><th>淨年化(估)</th><th>下單時間</th><th>成交時間</th><th>到期時間</th><th>掛單ID</th></tr></thead>
+          <tbody id="offersBody"></tbody>
+        </table>
+      </div></div>
+      <div class="row-count" id="offersCount"></div>
+    </section>
+  </div>
 
-    <div class="panel">
-      <h2>篩選</h2>
+  <div class="tab-panel" id="tab-history">
+    <section class="panel">
+      <p class="eyebrow">篩選條件</p>
       <div class="filters">
-        <div class="filter-field">
-          <label for="fTenor">天期</label>
-          <select id="fTenor"><option value="all">全部</option></select>
+        <div class="ff"><label for="fTenor">天期</label><select id="fTenor"><option value="">全部</option></select></div>
+        <div class="ff"><label for="fStatus">狀態</label>
+          <select id="fStatus"><option value="">全部</option><option value="pending">等待成交中</option><option value="active">使用中</option><option value="matured">已到期</option><option value="cancelled">已撤銷重掛</option></select>
         </div>
-        <div class="filter-field">
-          <label for="fStatus">狀態</label>
-          <select id="fStatus">
-            <option value="all">全部</option>
-            <option value="pending">等待成交中</option>
-            <option value="active">使用中</option>
-            <option value="matured">已到期</option>
-            <option value="cancelled">已撤銷重掛</option>
-          </select>
-        </div>
-        <div class="filter-field">
-          <label for="fStart">起始日期（依下單時間）</label>
-          <input type="date" id="fStart" />
-        </div>
-        <div class="filter-field">
-          <label for="fEnd">結束日期</label>
-          <input type="date" id="fEnd" />
-        </div>
-        <button class="primary" id="downloadBtn">下載篩選結果 CSV</button>
+        <div class="ff"><label for="fStart">起始日期</label><input type="date" id="fStart" /></div>
+        <div class="ff"><label for="fEnd">結束日期</label><input type="date" id="fEnd" /></div>
+        <button class="action" id="applyFilterBtn">套用篩選</button>
+        <button class="ghost" id="downloadCsvBtn">下載目前結果 CSV</button>
       </div>
-    </div>
+    </section>
+    <section class="panel">
+      <p class="eyebrow">部位明細</p>
+      <div class="table-scroll"><div class="table-wrap">
+        <table>
+          <thead><tr><th>狀態</th><th>標籤</th><th>天期</th><th>金額</th><th>本金部分</th><th>利潤部分</th><th>毛年化</th><th>淨年化(估)</th><th>下單時間</th><th>成交時間</th><th>到期時間</th><th>已實現利潤</th></tr></thead>
+          <tbody id="historyBody"></tbody>
+        </table>
+      </div></div>
+      <div class="row-count" id="historyCount"></div>
+    </section>
+  </div>
 
-    <div class="panel">
-      <h2>圖表</h2>
+  <div class="tab-panel" id="tab-earnings">
+    <section class="panel">
+      <p class="eyebrow">收益總覽</p>
+      <div class="tiles" id="earningsTiles"></div>
+    </section>
+    <section class="panel">
       <div class="chart-grid">
         <div>
-          <div style="font-size:12px;color:var(--text-secondary);margin-bottom:6px;">累積已實現利潤（依到期時間）</div>
+          <div class="chart-title">累積已實現利潤（依到期時間）</div>
           <div id="lineChartWrap"></div>
         </div>
         <div>
-          <div style="font-size:12px;color:var(--text-secondary);margin-bottom:6px;">各天期已實現利潤</div>
+          <div class="chart-title">各天期已實現利潤</div>
           <div id="barChartWrap"></div>
         </div>
       </div>
-    </div>
-
-    <div class="panel">
-      <h2>部位明細</h2>
-      <div class="table-scroll">
-        <table>
-          <thead>
-            <tr>
-              <th>狀態</th><th>天期</th><th>金額</th><th>本金部分</th><th>利潤部分</th>
-              <th>毛年化</th><th>淨年化</th><th>下單時間</th><th>成交時間</th><th>到期時間</th><th>已實現利潤</th>
-            </tr>
-          </thead>
-          <tbody id="tableBody"></tbody>
-        </table>
-      </div>
-      <div class="row-count" id="rowCount"></div>
-    </div>
+    </section>
   </div>
 </div>
 <div class="tooltip" id="tooltip"></div>
 
 <script>
 (function(){
-  const TENOR_COLOR = {2: 'var(--series-1)', 7: 'var(--series-2)', 30: 'var(--series-3)', 120: 'var(--series-4)'};
-  let allRows = [];
+  const DAY = 86400000;
+  const STATUS_LABEL = {pending:'等待成交中', active:'使用中', matured:'已到期', cancelled:'已撤銷重掛'};
+  const TENOR_COLOR_VARS = ['--tenor-1','--tenor-2','--tenor-3','--tenor-4'];
+  const PLATFORM_FEE = 0.15;
+  let state = null;
+  let hasFullState = true;
+  let lastHistoryRows = [];
   let downloadsNS = null;
 
-  claude.use('downloads').then(ns => {
-    downloadsNS = ns;
-    if (!ns) document.getElementById('downloadBtn').title = '此檢視無法下載檔案';
-  }).catch(() => { downloadsNS = null; });
-
-  function parseCSV(text) {
-    const lines = text.replace(/\r/g, '').split('\n').filter(l => l.length > 0);
-    if (lines.length < 2) return [];
-    const header = lines[0].split(',');
-    const rows = [];
-    for (let i = 1; i < lines.length; i++) {
-      const cols = lines[i].split(',');
-      if (cols.length < header.length) continue;
-      const r = {};
-      header.forEach((h, idx) => r[h] = cols[idx]);
-      r.tenor_days = parseInt(r.tenor_days, 10);
-      r.amount = parseFloat(r.amount);
-      r.principal_component = parseFloat(r.principal_component);
-      r.profit_component = parseFloat(r.profit_component);
-      r.gross_apr = parseFloat(r.gross_apr);
-      r.net_apr = parseFloat(r.net_apr);
-      r.interest_earned = r.interest_earned === '' ? null : parseFloat(r.interest_earned);
-      rows.push(r);
-    }
-    return rows;
+  if (window.claude && window.claude.use) {
+    window.claude.use('downloads').then(ns => {
+      downloadsNS = ns;
+      if (!ns) document.getElementById('downloadCsvBtn').title = '此檢視無法直接下載檔案';
+    }).catch(() => { downloadsNS = null; });
   }
 
-  const STATUS_LABEL = {pending: '等待成交中', active: '使用中', matured: '已到期', cancelled: '已撤銷重掛'};
-
-  function fmtUSD(n) { return '$' + n.toLocaleString('en-US', {maximumFractionDigits: 0}); }
-  function fmtPct(n) { return (n*100).toFixed(2) + '%'; }
-  function fmtDate(iso) { if (!iso) return ''; return iso.slice(0,10) + ' ' + iso.slice(11,16); }
-
-  function populateTenorFilter() {
-    const tenors = Array.from(new Set(allRows.map(r => r.tenor_days))).sort((a,b) => a-b);
-    const sel = document.getElementById('fTenor');
-    sel.innerHTML = '<option value="all">全部</option>' +
-      tenors.map(t => `<option value="${t}">${t} 天</option>`).join('');
-  }
-
-  function currentFilters() {
+  // ---------- sample data (clearly labeled, shown at rest so the page never opens empty) ----------
+  function iso(daysAgoN) { return new Date(Date.now() - daysAgoN * DAY).toISOString(); }
+  function buildSampleState() {
+    const positions = [
+      // matured
+      {id:'m1', amount:6000, principal_component:5970, profit_component:30, daily_rate:0.00024, tenor_days:30, placed_ts:iso(45), filled_ts:iso(45), maturity_ts:iso(15), status:'matured', matured_ts:iso(15), interest_earned:43.20, label:'', offer_id:'40231'},
+      {id:'m2', amount:5500, principal_component:5473, profit_component:27, daily_rate:0.00023, tenor_days:30, placed_ts:iso(38), filled_ts:iso(38), maturity_ts:iso(8), status:'matured', matured_ts:iso(8), interest_earned:37.95, label:'', offer_id:'40255'},
+      {id:'m3', amount:4000, principal_component:3980, profit_component:20, daily_rate:0.00021, tenor_days:7, placed_ts:iso(20), filled_ts:iso(20), maturity_ts:iso(13), status:'matured', matured_ts:iso(13), interest_earned:5.88, label:'', offer_id:'40310'},
+      {id:'m4', amount:4200, principal_component:4179, profit_component:21, daily_rate:0.00022, tenor_days:7, placed_ts:iso(15), filled_ts:iso(15), maturity_ts:iso(8), status:'matured', matured_ts:iso(8), interest_earned:6.47, label:'', offer_id:'40388'},
+      {id:'m5', amount:7000, principal_component:6965, profit_component:35, daily_rate:0.00025, tenor_days:30, placed_ts:iso(33), filled_ts:iso(33), maturity_ts:iso(3), status:'matured', matured_ts:iso(3), interest_earned:52.50, label:'', offer_id:'40402'},
+      {id:'m6', amount:3000, principal_component:2985, profit_component:15, daily_rate:0.00020, tenor_days:2, placed_ts:iso(5), filled_ts:iso(5), maturity_ts:iso(3), status:'matured', matured_ts:iso(3), interest_earned:1.20, label:'', offer_id:'40470'},
+      {id:'m7', amount:3200, principal_component:3184, profit_component:16, daily_rate:0.00021, tenor_days:2, placed_ts:iso(4), filled_ts:iso(4), maturity_ts:iso(2), status:'matured', matured_ts:iso(2), interest_earned:1.34, label:'', offer_id:'40491'},
+      {id:'m8', amount:2800, principal_component:2786, profit_component:14, daily_rate:0.00019, tenor_days:2, placed_ts:iso(6), filled_ts:iso(6), maturity_ts:iso(4), status:'matured', matured_ts:iso(4), interest_earned:1.06, label:'', offer_id:'40388'},
+      // active
+      {id:'a1', amount:5000, principal_component:4975, profit_component:25, daily_rate:0.00020, tenor_days:2, placed_ts:iso(1), filled_ts:iso(1), maturity_ts:iso(-1), status:'active', matured_ts:null, interest_earned:null, label:'', offer_id:'40602'},
+      {id:'a2', amount:4500, principal_component:4478, profit_component:22, daily_rate:0.00021, tenor_days:7, placed_ts:iso(3), filled_ts:iso(3), maturity_ts:iso(-4), status:'active', matured_ts:null, interest_earned:null, label:'', offer_id:'40615'},
+      // pending
+      {id:'p1', amount:3000, principal_component:2985, profit_component:15, daily_rate:0.00020, tenor_days:2, placed_ts:iso(0.125), filled_ts:null, maturity_ts:null, status:'pending', matured_ts:null, interest_earned:null, label:'', offer_id:'40701'},
+      {id:'p2', amount:4000, principal_component:3980, profit_component:20, daily_rate:0.00024, tenor_days:30, placed_ts:iso(0.25), filled_ts:null, maturity_ts:null, status:'pending', matured_ts:null, interest_earned:null, label:'', offer_id:'40708'},
+      // cancelled (stale, re-listed)
+      {id:'c1', amount:1500, principal_component:1500, profit_component:0, daily_rate:0.00019, tenor_days:2, placed_ts:iso(2), filled_ts:null, maturity_ts:null, status:'cancelled', matured_ts:iso(1.9), interest_earned:0, label:'', offer_id:'40540'},
+    ];
     return {
-      tenor: document.getElementById('fTenor').value,
-      status: document.getElementById('fStatus').value,
-      start: document.getElementById('fStart').value,
-      end: document.getElementById('fEnd').value,
+      principal_contributed_total: 50000,
+      idle_principal: 33500.00,
+      idle_profit: 149.61,
+      realized_profit_total: 149.61,
+      positions,
     };
   }
 
-  function applyFilters(rows, f) {
-    return rows.filter(r => {
-      if (f.tenor !== 'all' && String(r.tenor_days) !== f.tenor) return false;
-      if (f.status !== 'all' && r.status !== f.status) return false;
-      const placedDate = r.placed_ts.slice(0,10);
-      if (f.start && placedDate < f.start) return false;
-      if (f.end && placedDate > f.end) return false;
-      return true;
-    });
+  // ---------- analytics (mirrors tsgex_bfx_bot/analytics.py exactly) ----------
+  function overview(s) {
+    const open = s.positions.filter(p => p.status === 'pending' || p.status === 'active');
+    const active = open.filter(p => p.status === 'active').reduce((sum,p)=>sum+p.amount,0);
+    const pending = open.filter(p => p.status === 'pending').reduce((sum,p)=>sum+p.amount,0);
+    const idleTotal = (s.idle_principal ?? 0) + (s.idle_profit ?? 0);
+    return {
+      principal_contributed_total: s.principal_contributed_total,
+      idle_principal: s.idle_principal, idle_profit: s.idle_profit, idle_total: idleTotal,
+      committed_active: active, committed_pending: pending, committed_total: active+pending,
+      realized_profit_total: s.realized_profit_total,
+      net_worth_estimate: (s.principal_contributed_total!=null) ? idleTotal+active+pending : null,
+      position_count_total: s.positions.length, position_count_open: open.length,
+    };
   }
-
-  function render() {
-    const f = currentFilters();
-    const rows = applyFilters(allRows, f);
-    renderSummary(rows);
-    renderTable(rows);
-    renderLineChart(rows);
-    renderBarChart(rows);
+  function openOffers(s, fee) {
+    return s.positions.filter(p => p.status==='pending'||p.status==='active')
+      .sort((a,b)=> b.placed_ts.localeCompare(a.placed_ts))
+      .map(p => ({...p, gross_apr: p.daily_rate*365, net_apr: p.daily_rate*365*(1-fee)}));
   }
-
-  function renderSummary(rows) {
-    const active = rows.filter(r => r.status === 'active');
-    const pending = rows.filter(r => r.status === 'pending');
-    const matured = rows.filter(r => r.status === 'matured');
-    const cancelled = rows.filter(r => r.status === 'cancelled');
-    const activeAmount = active.reduce((s,r) => s+r.amount, 0);
-    const activePrincipal = active.reduce((s,r) => s+r.principal_component, 0);
-    const activeProfit = active.reduce((s,r) => s+r.profit_component, 0);
-    const pendingAmount = pending.reduce((s,r) => s+r.amount, 0);
-    const realizedProfit = matured.reduce((s,r) => s+(r.interest_earned||0), 0);
-    const el = document.getElementById('summaryCards');
-    el.innerHTML = [
-      ['使用中部位金額', fmtUSD(activeAmount), ''],
-      ['使用中本金', fmtUSD(activePrincipal), ''],
-      ['使用中利潤（含複投）', fmtUSD(activeProfit), 'profit'],
-      ['等待成交中金額', fmtUSD(pendingAmount), ''],
-      ['篩選範圍已實現利潤', fmtUSD(realizedProfit), 'profit'],
-      ['已撤銷重掛次數', cancelled.length.toLocaleString(), ''],
-      ['部位數（篩選後）', rows.length.toLocaleString(), ''],
-    ].map(([label, value, cls]) => `
-      <div class="card"><div class="label">${label}</div><div class="value ${cls}">${value}</div></div>
-    `).join('');
+  function history(s, f, fee) {
+    let rows = s.positions;
+    if (f.tenor) rows = rows.filter(p => String(p.tenor_days) === f.tenor);
+    if (f.status) rows = rows.filter(p => p.status === f.status);
+    if (f.start) rows = rows.filter(p => p.placed_ts.slice(0,10) >= f.start);
+    if (f.end) rows = rows.filter(p => p.placed_ts.slice(0,10) <= f.end);
+    return rows.slice().sort((a,b)=> b.placed_ts.localeCompare(a.placed_ts))
+      .map(p => ({...p, gross_apr: p.daily_rate*365, net_apr: p.daily_rate*365*(1-fee)}));
   }
-
-  function renderTable(rows) {
-    const sorted = [...rows].sort((a,b) => b.placed_ts.localeCompare(a.placed_ts));
-    const body = document.getElementById('tableBody');
-    const shown = sorted.slice(0, 500);
-    body.innerHTML = shown.map(r => `
-      <tr>
-        <td><span class="status-pill status-${r.status}">${STATUS_LABEL[r.status] || r.status}</span></td>
-        <td>${r.tenor_days}d</td>
-        <td>${fmtUSD(r.amount)}</td>
-        <td>${fmtUSD(r.principal_component)}</td>
-        <td>${fmtUSD(r.profit_component)}</td>
-        <td>${fmtPct(r.gross_apr)}</td>
-        <td>${fmtPct(r.net_apr)}</td>
-        <td>${fmtDate(r.placed_ts)}</td>
-        <td>${fmtDate(r.filled_ts) || '—'}</td>
-        <td>${fmtDate(r.maturity_ts) || '—'}</td>
-        <td>${r.interest_earned !== null ? fmtUSD(r.interest_earned) : '—'}</td>
-      </tr>
-    `).join('');
-    document.getElementById('rowCount').textContent =
-      `顯示 ${shown.length.toLocaleString()} / ${rows.length.toLocaleString()} 筆` + (rows.length > 500 ? '（表格上限500筆，下載CSV可取得全部）' : '');
+  function earnings(s) {
+    const matured = s.positions.filter(p => p.status==='matured' && p.matured_ts).sort((a,b)=>a.matured_ts.localeCompare(b.matured_ts));
+    let running = 0;
+    const cum = matured.map(p => { running += (p.interest_earned||0); return {matured_ts:p.matured_ts, cumulative_profit:running}; });
+    const byTenor = {};
+    matured.forEach(p => { byTenor[p.tenor_days] = (byTenor[p.tenor_days]||0) + (p.interest_earned||0); });
+    return {
+      realized_profit_total: s.realized_profit_total, matured_position_count: matured.length,
+      cancelled_stale_count: s.positions.filter(p=>p.status==='cancelled').length,
+      cumulative_by_maturity: cum, profit_by_tenor: byTenor,
+    };
   }
-
-  function renderLineChart(rows) {
-    const wrap = document.getElementById('lineChartWrap');
-    const matured = rows.filter(r => r.status === 'matured' && r.matured_ts).sort((a,b) => a.matured_ts.localeCompare(b.matured_ts));
-    if (matured.length === 0) {
-      wrap.innerHTML = '<div class="chart-empty">篩選範圍內沒有已到期部位</div>';
-      return;
+  function apr(s, nowMs, fee) {
+    const active = s.positions.filter(p => p.status==='active');
+    const activeAmount = active.reduce((sum,p)=>sum+p.amount,0);
+    const weightedGross = activeAmount>1e-9 ? active.reduce((sum,p)=>sum+p.amount*p.daily_rate*365,0)/activeAmount : null;
+    const weightedNet = weightedGross!==null ? weightedGross*(1-fee) : null;
+    let realizedApr = null, elapsedDays = null;
+    if (s.positions.length && s.principal_contributed_total > 1e-9) {
+      const earliest = Math.min(...s.positions.map(p => new Date(p.placed_ts).getTime()));
+      elapsedDays = (nowMs - earliest) / DAY;
+      if (elapsedDays > 0) realizedApr = (s.realized_profit_total / s.principal_contributed_total) * (365/elapsedDays);
     }
-    let cum = 0;
-    const pts = matured.map(r => { cum += (r.interest_earned||0); return {t: new Date(r.matured_ts).getTime(), v: cum}; });
-    const W = 520, H = 220, PAD = 36;
-    const t0 = pts[0].t, t1 = pts[pts.length-1].t;
-    const vMax = Math.max(...pts.map(p => p.v), 1);
-    const x = t => t1 === t0 ? PAD : PAD + (t - t0) / (t1 - t0) * (W - PAD*2);
-    const y = v => H - PAD - (v / vMax) * (H - PAD*2);
-    const path = pts.map((p,i) => (i===0?'M':'L') + x(p.t).toFixed(1) + ',' + y(p.v).toFixed(1)).join(' ');
-    const areaPath = path + ` L${x(pts[pts.length-1].t).toFixed(1)},${H-PAD} L${x(pts[0].t).toFixed(1)},${H-PAD} Z`;
+    return {current_weighted_gross_apr: weightedGross, current_weighted_net_apr: weightedNet,
+            current_active_capital: activeAmount, realized_apr: realizedApr,
+            realized_profit_total: s.realized_profit_total, elapsed_days: elapsedDays};
+  }
 
+  // ---------- formatting ----------
+  function fmtUSD(n) { if (n===null||n===undefined||isNaN(n)) return '—'; return '$' + n.toLocaleString('en-US',{maximumFractionDigits:0}); }
+  function fmtPct(n) { if (n===null||n===undefined) return '—'; return (n*100).toFixed(2) + '%'; }
+  function fmtDate(iso) { if (!iso) return '—'; return iso.slice(0,10) + ' ' + iso.slice(11,16); }
+  function tenorColor(t, idx) {
+    const known = {2: '--tenor-1', 7: '--tenor-2', 30: '--tenor-3'};
+    const v = known[t] || TENOR_COLOR_VARS[idx % TENOR_COLOR_VARS.length];
+    return `var(${v})`;
+  }
+
+  // ---------- rendering ----------
+  function setSourceBadge(label, isReal) {
+    const badge = document.getElementById('sourceBadge');
+    badge.textContent = isReal ? '真實資料' : '範例資料';
+    badge.classList.toggle('real', isReal);
+    document.getElementById('sourceLabel').textContent = label;
+  }
+
+  function renderOverview() {
+    const o = overview(state);
+    const tiles = [
+      ['累計投入本金', fmtUSD(o.principal_contributed_total), 'ink', ''],
+      ['閒置本金', fmtUSD(o.idle_principal), 'ink', hasFullState ? '' : '需上傳 state.json'],
+      ['閒置利潤', fmtUSD(o.idle_profit), 'profit', hasFullState ? '' : '需上傳 state.json'],
+      ['使用中金額（已成交）', fmtUSD(o.committed_active), 'ink', ''],
+      ['等待成交中金額', fmtUSD(o.committed_pending), 'pending', ''],
+      ['已實現利潤總額', fmtUSD(o.realized_profit_total), 'profit', ''],
+      ['淨值估計', fmtUSD(o.net_worth_estimate), 'ink', hasFullState ? '' : '需上傳 state.json'],
+      ['目前未平倉部位數', o.position_count_open.toLocaleString(), 'ink', ''],
+    ];
+    document.getElementById('overviewTiles').innerHTML = tiles.map(([l,v,rail,sub]) => `
+      <div class="tile rail-${rail}${sub?' dim':''}"><div class="label">${l}</div><div class="value${rail==='profit'?' profit':''}">${v}</div>${sub?`<div class="sub">${sub}</div>`:''}</div>
+    `).join('');
+
+    // allocation bar
+    const wrap = document.getElementById('allocationBar');
+    const idle = Math.max(0, o.idle_total||0), active = o.committed_active, pending = o.committed_pending;
+    const total = idle+active+pending || 1;
+    const segs = [
+      {label:'閒置', v:idle, color:'var(--ink-3)'},
+      {label:'使用中', v:active, color:'var(--accent)'},
+      {label:'等待成交中', v:pending, color:'var(--pending)'},
+    ];
+    wrap.innerHTML = `<div style="display:flex;height:26px;border-radius:6px;overflow:hidden;border:1px solid var(--border);">` +
+      segs.map(s => `<div style="width:${(s.v/total*100).toFixed(2)}%;background:${s.color};" title="${s.label}: ${fmtUSD(s.v)}"></div>`).join('') + `</div>`;
+    document.getElementById('allocationLegend').innerHTML = segs.map(s =>
+      `<span><span class="swatch" style="background:${s.color}"></span>${s.label} ${fmtUSD(s.v)}</span>`).join('');
+  }
+
+  function renderOffers() {
+    const rows = openOffers(state, PLATFORM_FEE);
+    document.getElementById('offersBody').innerHTML = rows.map(r => `
+      <tr>
+        <td><span class="pill ${r.status}">${STATUS_LABEL[r.status]||r.status}</span></td>
+        <td>${r.tenor_days}d</td><td>${fmtUSD(r.amount)}</td><td>${(r.daily_rate*100).toFixed(4)}%</td>
+        <td>${fmtPct(r.gross_apr)}</td><td>${fmtPct(r.net_apr)}</td>
+        <td>${fmtDate(r.placed_ts)}</td><td>${fmtDate(r.filled_ts)}</td><td>${fmtDate(r.maturity_ts)}</td>
+        <td>${r.offer_id||'—'}</td>
+      </tr>`).join('');
+    document.getElementById('offersCount').textContent = `共 ${rows.length.toLocaleString()} 筆`;
+    document.getElementById('offersHint').textContent = hasFullState ? '（本地帳本記錄，非交易所即時對帳 — 即時對帳請使用本地儀表板 tsgex_bitfinex_dashboard.py）' : '';
+  }
+
+  function populateTenorFilter() {
+    const tenors = Array.from(new Set(state.positions.map(p=>p.tenor_days))).sort((a,b)=>a-b);
+    const sel = document.getElementById('fTenor');
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">全部</option>' + tenors.map(t=>`<option value="${t}">${t} 天</option>`).join('');
+    sel.value = cur;
+  }
+
+  function renderHistory() {
+    const f = {tenor: document.getElementById('fTenor').value, status: document.getElementById('fStatus').value,
+               start: document.getElementById('fStart').value, end: document.getElementById('fEnd').value};
+    const rows = history(state, f, PLATFORM_FEE);
+    lastHistoryRows = rows;
+    document.getElementById('historyBody').innerHTML = rows.map(r => `
+      <tr>
+        <td><span class="pill ${r.status}">${STATUS_LABEL[r.status]||r.status}</span></td>
+        <td>${r.label||'—'}</td><td>${r.tenor_days}d</td><td>${fmtUSD(r.amount)}</td>
+        <td>${fmtUSD(r.principal_component)}</td><td>${fmtUSD(r.profit_component)}</td>
+        <td>${fmtPct(r.gross_apr)}</td><td>${fmtPct(r.net_apr)}</td>
+        <td>${fmtDate(r.placed_ts)}</td><td>${fmtDate(r.filled_ts)}</td><td>${fmtDate(r.maturity_ts)}</td>
+        <td>${r.interest_earned!==null&&r.interest_earned!==undefined ? fmtUSD(r.interest_earned) : '—'}</td>
+      </tr>`).join('');
+    document.getElementById('historyCount').textContent = `共 ${rows.length.toLocaleString()} 筆`;
+  }
+
+  function renderEarnings() {
+    const e = earnings(state), a = apr(state, Date.now(), PLATFORM_FEE);
+    const tiles = [
+      ['已實現利潤總額', fmtUSD(e.realized_profit_total), 'profit'],
+      ['已到期部位數', e.matured_position_count.toLocaleString(), 'ink'],
+      ['已撤銷重掛次數', e.cancelled_stale_count.toLocaleString(), 'ink'],
+      ['使用中資金加權毛年化', fmtPct(a.current_weighted_gross_apr), 'ink'],
+      ['使用中資金加權淨年化(估)', fmtPct(a.current_weighted_net_apr), 'profit'],
+      ['歷史實際年化報酬（保守估）', fmtPct(a.realized_apr), 'profit'],
+    ];
+    document.getElementById('earningsTiles').innerHTML = tiles.map(([l,v,rail]) => `
+      <div class="tile rail-${rail}"><div class="label">${l}</div><div class="value${rail==='profit'?' profit':''}">${v}</div></div>
+    `).join('');
+    renderLineChart(e.cumulative_by_maturity);
+    renderBarChart(e.profit_by_tenor);
+  }
+
+  function renderLineChart(pts) {
+    const wrap = document.getElementById('lineChartWrap');
+    if (!pts.length) { wrap.innerHTML = '<div class="chart-empty">尚無已到期部位</div>'; return; }
+    const data = pts.map(p => ({t: new Date(p.matured_ts).getTime(), v: p.cumulative_profit}));
+    const W=520,H=220,PAD=38;
+    const t0=data[0].t, t1=data[data.length-1].t;
+    const vMax = Math.max(...data.map(p=>p.v), 1);
+    const x = t => t1===t0 ? PAD : PAD + (t-t0)/(t1-t0)*(W-PAD*2);
+    const y = v => H-PAD-(v/vMax)*(H-PAD*2);
+    const path = data.map((p,i)=>(i===0?'M':'L')+x(p.t).toFixed(1)+','+y(p.v).toFixed(1)).join(' ');
+    const area = path + ` L${x(data[data.length-1].t).toFixed(1)},${H-PAD} L${x(data[0].t).toFixed(1)},${H-PAD} Z`;
     let svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" style="max-width:${W}px;display:block">`;
-    svg += `<line x1="${PAD}" y1="${H-PAD}" x2="${W-8}" y2="${H-PAD}" stroke="var(--baseline)" stroke-width="1"/>`;
-    svg += `<path d="${areaPath}" fill="var(--series-3)" fill-opacity="0.14" stroke="none"/>`;
-    svg += `<path d="${path}" fill="none" stroke="var(--series-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`;
-    pts.forEach(p => {
-      svg += `<circle cx="${x(p.t).toFixed(1)}" cy="${y(p.v).toFixed(1)}" r="3" fill="var(--series-3)" class="pt" data-v="${p.v.toFixed(2)}" data-t="${p.t}"/>`;
-    });
-    svg += `<text x="${PAD}" y="14" font-size="11" fill="var(--text-muted)">${fmtUSD(vMax)}</text>`;
-    svg += `<text x="${PAD}" y="${H-PAD+18}" font-size="10" fill="var(--text-muted)">${new Date(t0).toISOString().slice(0,10)}</text>`;
-    svg += `<text x="${W-8}" y="${H-PAD+18}" font-size="10" fill="var(--text-muted)" text-anchor="end">${new Date(t1).toISOString().slice(0,10)}</text>`;
-    svg += `</svg>`;
+    svg += `<line x1="${PAD}" y1="${H-PAD}" x2="${W-8}" y2="${H-PAD}" stroke="var(--border-strong)" stroke-width="1"/>`;
+    svg += `<path d="${area}" fill="var(--accent)" fill-opacity="0.14" stroke="none"/>`;
+    svg += `<path d="${path}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`;
+    data.forEach(p => svg += `<circle cx="${x(p.t).toFixed(1)}" cy="${y(p.v).toFixed(1)}" r="3" fill="var(--accent)" class="pt" data-v="${p.v.toFixed(2)}" data-t="${p.t}"/>`);
+    svg += `<text x="${PAD}" y="16" font-family="IBM Plex Mono, monospace" font-size="11" fill="var(--ink-3)">${fmtUSD(vMax)}</text></svg>`;
     wrap.innerHTML = svg;
-
     const tip = document.getElementById('tooltip');
     wrap.querySelectorAll('.pt').forEach(el => {
-      el.addEventListener('mouseenter', ev => {
-        const rect = el.getBoundingClientRect();
+      el.addEventListener('mouseenter', () => {
+        const r = el.getBoundingClientRect();
         tip.textContent = fmtUSD(parseFloat(el.dataset.v)) + ' · ' + new Date(parseInt(el.dataset.t)).toISOString().slice(0,10);
-        tip.style.left = (rect.left + rect.width/2 + window.scrollX) + 'px';
-        tip.style.top = (rect.top + window.scrollY - 6) + 'px';
+        tip.style.left = (r.left + r.width/2 + window.scrollX) + 'px';
+        tip.style.top = (r.top + window.scrollY - 6) + 'px';
         tip.style.opacity = '1';
       });
-      el.addEventListener('mouseleave', () => { tip.style.opacity = '0'; });
+      el.addEventListener('mouseleave', () => tip.style.opacity = '0');
     });
   }
 
-  function renderBarChart(rows) {
+  function renderBarChart(byTenor) {
     const wrap = document.getElementById('barChartWrap');
-    const matured = rows.filter(r => r.status === 'matured');
-    if (matured.length === 0) {
-      wrap.innerHTML = '<div class="chart-empty">篩選範圍內沒有已到期部位</div>';
-      return;
-    }
-    const byTenor = {};
-    matured.forEach(r => { byTenor[r.tenor_days] = (byTenor[r.tenor_days]||0) + (r.interest_earned||0); });
-    const tenors = Object.keys(byTenor).map(Number).sort((a,b) => a-b);
-    const W = 360, H = 220, PAD_L = 46, PAD_B = 30, PAD_T = 10;
-    const maxV = Math.max(...tenors.map(t => byTenor[t]), 1);
-    const barW = (W - PAD_L - 16) / tenors.length * 0.6;
-    const gap = (W - PAD_L - 16) / tenors.length;
-
+    const tenors = Object.keys(byTenor).map(Number).sort((a,b)=>a-b);
+    if (!tenors.length) { wrap.innerHTML = '<div class="chart-empty">尚無已到期部位</div>'; return; }
+    const W=360,H=220,PAD_L=48,PAD_B=30,PAD_T=10;
+    const maxV = Math.max(...tenors.map(t=>byTenor[t]), 1);
+    const gap = (W-PAD_L-16)/tenors.length, barW = gap*0.6;
     let svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" style="max-width:${W}px;display:block">`;
-    svg += `<line x1="${PAD_L}" y1="${H-PAD_B}" x2="${W-8}" y2="${H-PAD_B}" stroke="var(--baseline)" stroke-width="1"/>`;
-    tenors.forEach((t, i) => {
-      const v = byTenor[t];
-      const h = (v / maxV) * (H - PAD_T - PAD_B);
-      const bx = PAD_L + i*gap + (gap-barW)/2;
-      const by = H - PAD_B - h;
-      svg += `<rect x="${bx.toFixed(1)}" y="${by.toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" rx="4" fill="${TENOR_COLOR[t] || 'var(--series-1)'}" class="bar" data-v="${v.toFixed(2)}" data-t="${t}"/>`;
-      svg += `<text x="${(bx+barW/2).toFixed(1)}" y="${H-PAD_B+16}" font-size="11" fill="var(--text-secondary)" text-anchor="middle">${t}d</text>`;
+    svg += `<line x1="${PAD_L}" y1="${H-PAD_B}" x2="${W-8}" y2="${H-PAD_B}" stroke="var(--border-strong)" stroke-width="1"/>`;
+    tenors.forEach((t,i) => {
+      const v = byTenor[t], h = (v/maxV)*(H-PAD_T-PAD_B);
+      const bx = PAD_L + i*gap + (gap-barW)/2, by = H-PAD_B-h;
+      svg += `<rect x="${bx.toFixed(1)}" y="${by.toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" rx="4" fill="${tenorColor(t,i)}" class="bar" data-v="${v.toFixed(2)}" data-t="${t}"/>`;
+      svg += `<text x="${(bx+barW/2).toFixed(1)}" y="${H-PAD_B+16}" font-family="IBM Plex Mono, monospace" font-size="11" fill="var(--ink-2)" text-anchor="middle">${t}d</text>`;
     });
-    svg += `<text x="4" y="${PAD_T+8}" font-size="11" fill="var(--text-muted)">${fmtUSD(maxV)}</text>`;
-    svg += `</svg>`;
+    svg += `<text x="4" y="${PAD_T+8}" font-family="IBM Plex Mono, monospace" font-size="11" fill="var(--ink-3)">${fmtUSD(maxV)}</text></svg>`;
     wrap.innerHTML = svg;
-
     const tip = document.getElementById('tooltip');
     wrap.querySelectorAll('.bar').forEach(el => {
-      el.addEventListener('mouseenter', ev => {
-        const rect = el.getBoundingClientRect();
+      el.addEventListener('mouseenter', () => {
+        const r = el.getBoundingClientRect();
         tip.textContent = el.dataset.t + '天：' + fmtUSD(parseFloat(el.dataset.v));
-        tip.style.left = (rect.left + rect.width/2 + window.scrollX) + 'px';
-        tip.style.top = (rect.top + window.scrollY - 6) + 'px';
+        tip.style.left = (r.left + r.width/2 + window.scrollX) + 'px';
+        tip.style.top = (r.top + window.scrollY - 6) + 'px';
         tip.style.opacity = '1';
       });
-      el.addEventListener('mouseleave', () => { tip.style.opacity = '0'; });
+      el.addEventListener('mouseleave', () => tip.style.opacity = '0');
     });
   }
 
-  function rowsToCSV(rows) {
-    const header = ['id','status','label','tenor_days','amount','principal_component','profit_component',
-      'daily_rate','gross_apr','net_apr','placed_ts','filled_ts','maturity_ts','matured_ts','interest_earned'];
-    const lines = [header.join(',')];
-    rows.forEach(r => {
-      lines.push([r.id, r.status, r.label, r.tenor_days, r.amount, r.principal_component, r.profit_component,
-        r.daily_rate, r.gross_apr, r.net_apr, r.placed_ts, r.filled_ts||'', r.maturity_ts||'', r.matured_ts||'',
-        r.interest_earned ?? ''].join(','));
-    });
-    return lines.join('\n');
+  function renderAll() {
+    populateTenorFilter();
+    renderOverview();
+    renderOffers();
+    renderHistory();
+    renderEarnings();
   }
 
-  document.getElementById('fileInput').addEventListener('change', function(ev) {
+  // ---------- tabs ----------
+  document.getElementById('tabNav').addEventListener('click', ev => {
+    const btn = ev.target.closest('button[data-tab]');
+    if (!btn) return;
+    document.querySelectorAll('#tabNav button').forEach(b => b.classList.toggle('active', b===btn));
+    document.querySelectorAll('.tab-panel').forEach(t => t.classList.toggle('active', t.id === 'tab-'+btn.dataset.tab));
+  });
+  document.getElementById('applyFilterBtn').addEventListener('click', renderHistory);
+
+  // ---------- file loading: full state.json (preferred) or legacy positions-only CSV ----------
+  function parseCSVToState(text) {
+    const lines = text.replace(/\r/g,'').split('\n').filter(l=>l.length>0);
+    if (lines.length < 2) return null;
+    const header = lines[0].split(',');
+    const positions = [];
+    for (let i=1;i<lines.length;i++) {
+      const cols = lines[i].split(',');
+      if (cols.length < header.length) continue;
+      const r = {};
+      header.forEach((h,idx)=> r[h]=cols[idx]);
+      positions.push({
+        id:r.id, status:r.status, label:r.label, tenor_days:parseInt(r.tenor_days,10), amount:parseFloat(r.amount),
+        principal_component:parseFloat(r.principal_component), profit_component:parseFloat(r.profit_component),
+        daily_rate:parseFloat(r.daily_rate), placed_ts:r.placed_ts, filled_ts:r.filled_ts||null,
+        maturity_ts:r.maturity_ts||null, matured_ts:r.matured_ts||null,
+        interest_earned: r.interest_earned==='' ? null : parseFloat(r.interest_earned), offer_id:null,
+      });
+    }
+    const realizedTotal = positions.filter(p=>p.status==='matured').reduce((s,p)=>s+(p.interest_earned||0),0);
+    return {principal_contributed_total:null, idle_principal:null, idle_profit:null, realized_profit_total:realizedTotal, positions};
+  }
+
+  document.getElementById('fileInput').addEventListener('change', function(ev){
     const file = ev.target.files[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = function(e) {
-      allRows = parseCSV(e.target.result);
-      document.getElementById('fileHint').textContent = `已載入 ${file.name}（${allRows.length.toLocaleString()} 筆部位）`;
-      document.getElementById('dashboardBody').hidden = allRows.length === 0;
-      try { localStorage.setItem('bfx_dashboard_last_csv', e.target.result); } catch (err) {}
-      populateTenorFilter();
-      render();
+    reader.onload = e => {
+      try {
+        if (file.name.toLowerCase().endsWith('.json')) {
+          const raw = JSON.parse(e.target.result);
+          if (!raw.positions) throw new Error('缺少 positions 欄位，不是有效的 bfx_bot_state.json');
+          state = raw; hasFullState = true;
+        } else {
+          const parsed = parseCSVToState(e.target.result);
+          if (!parsed) throw new Error('CSV 格式不符或無資料列');
+          state = parsed; hasFullState = false;
+        }
+        setSourceBadge(`已載入：${file.name}（${state.positions.length.toLocaleString()} 筆部位）`, true);
+        try { localStorage.setItem('bfx_ledger_last_file', JSON.stringify({name:file.name, state, hasFullState})); } catch(err) {}
+        renderAll();
+      } catch (err) {
+        alert('讀取失敗：' + err.message);
+      }
     };
     reader.readAsText(file);
   });
 
-  ['fTenor','fStatus','fStart','fEnd'].forEach(id => {
-    document.getElementById(id).addEventListener('change', render);
+  // ---------- CSV download of current filtered history ----------
+  function rowsToCSV(rows) {
+    const header = ['id','status','label','tenor_days','amount','principal_component','profit_component',
+      'daily_rate','gross_apr','net_apr','placed_ts','filled_ts','maturity_ts','matured_ts','interest_earned'];
+    const lines = [header.join(',')];
+    rows.forEach(r => lines.push(header.map(h => r[h] ?? '').join(',')));
+    return lines.join('\n');
+  }
+  document.getElementById('downloadCsvBtn').addEventListener('click', async () => {
+    if (!lastHistoryRows.length) return;
+    const csv = rowsToCSV(lastHistoryRows);
+    if (downloadsNS) {
+      try { await downloadsNS.save({filename:'bfx_bot_history_filtered.csv', data:csv}); }
+      catch (err) { if (!err || err.code !== 'declined') alert('下載失敗：' + (err && err.message ? err.message : String(err))); }
+    } else {
+      alert('此檢視環境不支援直接下載，請改用「另存新檔」或複製表格內容。');
+    }
   });
 
-  document.getElementById('downloadBtn').addEventListener('click', async function() {
-    const f = currentFilters();
-    const rows = applyFilters(allRows, f);
-    if (rows.length === 0) return;
-    const csv = rowsToCSV(rows);
-    if (!downloadsNS) { alert('此檢視環境不支援直接下載，請改用「另存新檔」或複製表格內容。'); return; }
+  // ---------- init: restore last real upload from this browser, else the labeled sample ----------
+  (function init(){
     try {
-      await downloadsNS.save({filename: 'bfx_bot_positions_filtered.csv', data: csv});
-    } catch (err) {
-      if (err && err.code === 'declined') return;
-      alert('下載失敗：' + (err && err.message ? err.message : String(err)));
-    }
-  });
-
-  // Restore last-loaded CSV from this browser's local storage, if any (per-viewer convenience only)
-  try {
-    const cached = localStorage.getItem('bfx_dashboard_last_csv');
-    if (cached) {
-      allRows = parseCSV(cached);
-      if (allRows.length > 0) {
-        document.getElementById('fileHint').textContent = `已還原上次載入的資料（${allRows.length.toLocaleString()} 筆部位）— 可重新選檔覆蓋`;
-        document.getElementById('dashboardBody').hidden = false;
-        populateTenorFilter();
-        render();
+      const cached = localStorage.getItem('bfx_ledger_last_file');
+      if (cached) {
+        const {name, state: s, hasFullState: h} = JSON.parse(cached);
+        state = s; hasFullState = h;
+        setSourceBadge(`已還原上次載入：${name}（可重新選檔覆蓋）`, true);
+        renderAll();
+        return;
       }
-    }
-  } catch (err) {}
+    } catch(err) {}
+    state = buildSampleState(); hasFullState = true;
+    setSourceBadge('目前顯示的是示範用途的模擬資料，上傳您的檔案即可看到真實數字', false);
+    renderAll();
+  })();
 })();
 </script>

@@ -1,5 +1,188 @@
 # Changelog
 
+## v5.3 (real, API-connected local web dashboard)
+
+The user pointed out the only dashboard that existed (the CSV-import
+Artifact from the v5 revision) was import-only and had none of: an
+API-connected view, asset overview, open-order detail, total/annualized
+earnings, principal, lending history, or switching between sub-accounts with
+different API keys -- and asked for all of it to actually be built, not just
+described.
+
+**Why this had to be a new local web server, not more work on the existing
+Artifact:** a claude.ai Artifact page's sandbox blocks browser-side
+`fetch`/`XHR` to any host outside a small CDN allowlist, and
+`api.bitfinex.com` is not on it -- a browser-only Artifact page cannot call
+the live Bitfinex API AT ALL, full stop, regardless of how the page is
+written. This is a hard platform constraint discovered by reading the
+Artifact tool's own documented CSP, not a design tradeoff. Calling the real,
+authenticated API needs a real backend making the signed HTTP request
+server-side, so "串接 API 的頁面" and "切換不同子帳號串接不同 API" could only
+be honestly delivered as a local web server the user runs on their own
+machine (`python tsgex_bitfinex_dashboard.py`) using the bot's own existing
+`client.py`.
+
+**New: `tsgex_bfx_bot/webapp.py`** -- a plain Python `http.server` (stdlib
+only, no new dependency) binding to `127.0.0.1` by default (refuses any
+other host without `--allow-remote`, since this can show real account
+balances) and serving:
+- `GET /` -- `webapp_static/dashboard.html`, a real multi-tab SPA: 資產總覽 /
+  掛單詳情 / 出借歷史紀錄 / 收益與年化報酬.
+- `GET /api/{overview,offers,history,earnings,apr}?profile=X` -- JSON backed
+  by the bot's own local ledger (`bfx_bot_state.json`), always available with
+  zero API keys or network access, PLUS an optional live-data overlay
+  (Bitfinex funding-wallet balance via a new `client.get_wallet_balances()`,
+  and a live open-offer count via the existing `get_active_funding_offers()`)
+  when a profile has working credentials -- every live call is wrapped so a
+  missing key or network failure degrades to "local ledger only, live
+  overlay unavailable," never a crash. Neither new client method has been
+  verified against a real Bitfinex call (network egress to Bitfinex is
+  blocked in the sandbox this bot was developed in) -- same disclosed caveat
+  as `extract_offer_id()` from v5.0.0.
+- `GET /api/profiles` + `--profiles-file` (`profiles.py`) -- multiple named
+  sub-accounts, each with its OWN state file and OWN env-var names for its
+  key/secret (never the credentials themselves, so a shared profiles.json
+  never leaks a secret, matching cli.py's existing env-var-only convention).
+  Switching accounts in the dashboard is a dropdown, no restart needed.
+
+**New: `tsgex_bfx_bot/analytics.py`** -- the actual numbers requested,
+computed as pure, unit-tested functions over `BotState` (shared by the API
+and directly testable without spinning up a server): `overview()` (principal
+contributed, idle principal/profit, committed active/pending, net worth
+estimate), `open_offers()` (current pending/active orders with gross/net
+APR), `history()` (the full filterable lending-history table), `earnings()`
+(realized profit total, cumulative-by-maturity series, profit by tenor), and
+`apr()` (two distinct, both-legitimate readings: current amount-weighted APR
+of just-active capital, and a conservative realized-APR annualizing total
+realized profit against total contributed principal since the earliest
+position -- see the function's docstring for a real caveat found via manual
+smoke-testing: this realized-APR figure goes nonsensical if computed against
+a ledger built with `--mock-days-per-cycle`, since that fast-forwards
+position timestamps ahead of real wall-clock time; irrelevant to real
+trading, only to fast-forwarded mock demos).
+
+Verified end-to-end against a REAL generated ledger (not just synthetic
+pytest fixtures): ran the bot for 10 fast-forwarded mock cycles, pointed
+`tsgex_bitfinex_dashboard.py --mock` at the resulting state file, and curled
+every route.
+
+Also kept the original CSV-import Artifact dashboard around
+(`reports/TSGEX_Bitfinex_Bot_Dashboard.html`) as a lighter option for
+eyeballing an exported CSV without running anything locally -- it never had,
+and structurally cannot have, live-API or multi-account features, for the
+same CSP reason above.
+
+## v5.2 (generalized N-tenor allocation, fixed_count tranche mode, rate-unit + min-order-size re-verification)
+
+Three follow-up questions from the user, answered by research where a claim
+needed verifying and by implementation where the feature was genuinely
+missing.
+
+**1. "Same-tenor tranche count could instead be a fixed number of concurrent
+orders, splitting total idle capital evenly?"** Added `StrategyConfig.
+tranche_sizing_mode`: `"calibrated"` (default, unchanged -- P75 real-trade-
+size inverted pyramid) or `"fixed_count"`, which splits a tenor bucket's
+capital evenly across `--max-concurrent-orders` tranches instead of deriving
+the count from calibration. Automatically reduces the count if capital/count
+would fall under Bitfinex's $150 minimum order size (`build_tranches_for_
+tenor` in `strategy.py`).
+
+**2. "Why only 2/7/30 days -- shouldn't 3,4,5,6,8,9,10...29 each get their own
+adaptive allocation?"** `best_rate_by_tenor()` no longer filters the live
+book to the fixed `TARGET_TENORS = (2, 7, 30)` shortlist -- it now returns
+every period actually quoted right now (Bitfinex accepts any period 2-120
+days). `decide_tenor_allocation()` was generalized to loop over however many
+periods are live: the shortest is the anchor, and each longer period
+(ascending) gets a share shifted from the anchor if its live net-APR premium
+over the anchor clears `--term-premium-min-pp`, up to a new `--max-total-
+shift-from-short` cap (default 0.7, extracted from what was previously a
+hardcoded literal) so the most liquid tenor is never fully vacated. A new
+`depth_by_tenor()` + `--min-period-depth-usd` (default $1,000) filter skips
+any period whose current book depth is too thin to reliably fill a real
+tranche against -- necessary now that the book isn't pre-filtered to only
+the three tenors known to be liquid (v4 finding #1: liquidity is 89.6%
+concentrated at 2d; most other periods are quoted by only a handful of
+participants). `MockBitfinexClient` now also generates thin quotes at
+3,4,5,6,8,9,10,14,21,29d so `--mock` exercises this meaningfully.
+
+**3. "Order rates should be submitted as hourly, not daily -- did you know
+that?"** Researched before changing anything, since silently complying with
+an incorrect unit claim would have introduced a severe live-trading pricing
+bug. Three independent, converging sources confirm the `rate` field in a
+Bitfinex funding-offer submission is a **daily** rate, not hourly: (a)
+Bitfinex's own funding interest formula is `amount * rate% * (seconds_lent /
+seconds_in_a_day) * (1 - fee%)`, explicitly a per-day basis; (b) Bitfinex's
+own worked example states "2 BTC at 0.04% = 0.0008 BTC/day"; (c) a real
+API response with `rate='0.0002'` at a 7-day period annualizes
+(`rate * 365`) to a realistic ~7.3% APR -- annualizing it as if hourly
+(`rate * 24 * 365`) would imply a nonsensical ~175% APR. **No code change**
+-- this codebase already treats `rate` as daily throughout (see `net_apr()`
+in `config.py`, `TENOR_TYPICAL_ORDER_SIZE`-based tranche rates in
+`strategy.py`). The likely source of the user's confusion: Bitfinex's Flash
+Return Rate (FRR) *updates* hourly (a different, real fact) -- but FRR's
+update cadence and an individual offer's own rate time-unit are unrelated
+facts about the same market.
+
+**4. "Research whether Bitfinex has a minimum order size, and enforce it."**
+Re-verified: Bitfinex's documented minimum funding-offer size is **$150
+USD** (Bitfinex Help Center), matching `constants.BFX_MIN_ORDER_USD`, already
+enforced where tranches are constructed (`build_tranches_for_tenor`'s
+`fixed_count` branch now explicitly floors the tranche count against it, and
+`runner.run_cycle` already skipped any tenor bucket below it before this
+change).
+
+## v5.1 (real backtest of the spike signal and term-premium persistence -- `enable_spike_reserve` now defaults False)
+
+The user asked for the FBRR-style prediction question to actually be
+answered, not just built around, using the real 5-year hourly p2/p30/p120
+rate data already collected (this sandbox cannot reach the Bitfinex API
+directly -- see `research/backtest_spike_and_premium.py` for the script and
+`research/backtest_results_2026-09-09.txt` for the raw output). Same
+standard as the earlier BTC technical-analysis study in this project:
+chronological split-half (fit on the first half, confirm on the held-out
+second half), compared against a naive "no change" baseline, negative
+results reported as plainly as positive ones.
+
+**Finding 1 (acted on): the spike-proxy signal's assumed direction is
+empirically backwards.** `compute_spike_signal` (fast MA(6) > slow MA(24))
+fires when the rate has recent upward momentum; `dave_high` mode's design
+assumed that meant "reserve capital, a further rate increase is coming."
+Tested against 5 years of real hourly data (n>11,000 per bucket, both
+in-sample and out-of-sample): when the signal fires, the rate's mean
+forward change over the next 24h/7d is **-0.7 to -1.0 percentage points**
+(a decline); when it doesn't fire, the mean forward change is **+0.6 to
++0.8pp** (a rise) -- the opposite of what the reserve logic assumes, and
+consistent across both halves of the data (not an in-sample artifact). This
+mirrors the earlier BTC finding that simple momentum/trend heuristics don't
+have real exploitable edge in this kind of market -- here the effect isn't
+even edge-less, it points the wrong way. **Action taken:** added
+`StrategyConfig.enable_spike_reserve` (default `False`) gating the reserve
+behavior; `dave_high` mode no longer silently reserves capital on this
+signal unless explicitly re-enabled with `--enable-spike-reserve`, which
+now carries an explicit warning about this finding. Not inverted into a new
+"fade the signal" bet -- a mean-reversion effect existing in aggregate
+(Test 1) did NOT translate into a useful point forecast (Test 3: using it
+to predict the future rate level was 2-5% WORSE than assuming no change at
+all), so the honest, appropriately cautious response is to disable the
+heuristic, not to flip it into an unvalidated opposite strategy.
+
+**Finding 2 (noted, no code change): the term premium's persistence is
+real but weaker than the in-sample numbers alone suggest.** The correlation
+between the currently observed 2d->30d premium and the premium N days later
+is positive but decays sharply out-of-sample (e.g. at the 7-day horizon:
++0.143 in-sample vs +0.038 out-of-sample) -- a classic sign of an unstable
+relationship, likely reflecting a few slow-moving multi-year regimes in the
+5-year window rather than a stable, exploitable pattern. Practically. the
+gap between "premium now >= the bot's 2pp threshold" and "premium now <
+2pp" in predicting the *future* premium is modest out-of-sample (+3.80pp vs
++3.23pp at 7 days) -- real, but nowhere near as clean a separation as the
+in-sample numbers (+6.96pp vs +5.19pp) implied. This does NOT invalidate
+`decide_tenor_allocation`'s design: it was always framed as reading the
+CURRENTLY available rate at each tenor, not forecasting where the premium
+is heading (see v4 finding #3) -- that framing turns out to be the right
+level of humility, since the data doesn't support treating the premium as
+strongly predictive of anything beyond itself right now.
+
 ## v5.0.0 (this modularization)
 
 Reorganized the single-file v5 script into the `tsgex_bfx_bot/` package

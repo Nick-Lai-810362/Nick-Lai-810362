@@ -23,6 +23,13 @@ class MockBitfinexClient(BitfinexClient):
         self._offers = []
         self._next_offer_id = 1000
 
+    # Real liquidity is overwhelmingly concentrated at 2d (see CHANGELOG.md
+    # v4 finding #1: 89.6% of trade count / 96%+ of volume). Periods 3-29 are
+    # quoted (Bitfinex accepts any period 2-120d), just thinly -- 1-2 orders
+    # each -- which is exactly the shape needed to exercise the generalized
+    # N-tenor allocation and cfg.min_period_depth_usd filter in --mock.
+    THIN_PERIODS = (3, 4, 5, 6, 8, 9, 10, 14, 21, 29)
+
     def get_funding_book(self, symbol: str, precision: str = "P0", length: int = 100):
         self._base_daily_rate_2d = max(0.00003, self._base_daily_rate_2d + self._rng.uniform(-0.000015, 0.000015))
         premium_pp = self._rng.choice([0.0, 0.01, 0.02, 0.04])  # sometimes flat, sometimes a real premium
@@ -35,6 +42,14 @@ class MockBitfinexClient(BitfinexClient):
                     extra = (premium_pp if tenor in (30, 120) else premium_pp * 0.4) / 365
                     rate = self._base_daily_rate_2d + extra + self._base_daily_rate_2d * i * 0.01
                 amount = round(self._rng.uniform(150, 5000), 2)
+                book.append([rate, tenor, 1, amount])
+        for tenor in self.THIN_PERIODS:
+            n_orders = self._rng.choice([1, 1, 2])  # thin: usually just one or two quotes
+            frac = (tenor - 2) / 28.0  # 0 at 2d, 1 at 30d -- interpolate toward the 30d premium
+            extra = (premium_pp * frac) / 365
+            for i in range(n_orders):
+                rate = self._base_daily_rate_2d + extra + self._base_daily_rate_2d * i * 0.01
+                amount = round(self._rng.uniform(150, 900), 2)  # deliberately thin depth
                 book.append([rate, tenor, 1, amount])
         return book
 
@@ -64,3 +79,11 @@ class MockBitfinexClient(BitfinexClient):
     def cancel_funding_offer(self, offer_id):
         self._offers = [o for o in self._offers if str(o[0]) != str(offer_id)]
         return {"status": "cancelled", "id": offer_id}
+
+    def get_wallet_balances(self):
+        committed = sum(o[4] for o in self._offers)  # AMOUNT of each still-open offer
+        available = round(50_000.0 - committed, 2)
+        return [["funding", "USD", available + committed, 0, max(0.0, available)]]
+
+    def get_funding_loans_history(self, symbol: str, limit: int = 200):
+        return []  # webapp.py falls back to the local ledger when this is empty

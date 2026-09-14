@@ -1,0 +1,38 @@
+====================================================================================================
+PART A: blended net APR vs. term_premium_min_pp, replayed against 42,911 real hourly fUSD p2/p30 observations (2021-08-23 10:00:00+00:00 to 2026-09-07 10:00:00+00:00)
+====================================================================================================
+thresh=0.0000  in-sample (first half)        n= 21455  blended_net_apr=  9.50%  always_2d_net_apr=  5.84%  lift=+3.66pp  mean_weight_on_30d= 50.3%
+thresh=0.0000  out-of-sample (second half)   n= 21456  blended_net_apr=  7.10%  always_2d_net_apr=  5.12%  lift=+1.98pp  mean_weight_on_30d= 44.8%
+thresh=0.0050  in-sample (first half)        n= 21455  blended_net_apr=  9.44%  always_2d_net_apr=  5.84%  lift=+3.60pp  mean_weight_on_30d= 46.0%
+thresh=0.0050  out-of-sample (second half)   n= 21456  blended_net_apr=  7.04%  always_2d_net_apr=  5.12%  lift=+1.91pp  mean_weight_on_30d= 39.6%
+thresh=0.0100  in-sample (first half)        n= 21455  blended_net_apr=  9.37%  always_2d_net_apr=  5.84%  lift=+3.53pp  mean_weight_on_30d= 42.3%
+thresh=0.0100  out-of-sample (second half)   n= 21456  blended_net_apr=  6.96%  always_2d_net_apr=  5.12%  lift=+1.83pp  mean_weight_on_30d= 34.9%
+thresh=0.0200  in-sample (first half)        n= 21455  blended_net_apr=  9.20%  always_2d_net_apr=  5.84%  lift=+3.36pp  mean_weight_on_30d= 35.4%
+thresh=0.0200  out-of-sample (second half)   n= 21456  blended_net_apr=  6.76%  always_2d_net_apr=  5.12%  lift=+1.63pp  mean_weight_on_30d= 26.5%
+thresh=0.0365  in-sample (first half)        n= 21455  blended_net_apr=  8.89%  always_2d_net_apr=  5.84%  lift=+3.05pp  mean_weight_on_30d= 26.7%
+thresh=0.0365  out-of-sample (second half)   n= 21456  blended_net_apr=  6.38%  always_2d_net_apr=  5.12%  lift=+1.26pp  mean_weight_on_30d= 16.3%
+thresh=0.0500  in-sample (first half)        n= 21455  blended_net_apr=  8.63%  always_2d_net_apr=  5.84%  lift=+2.79pp  mean_weight_on_30d= 21.9%
+thresh=0.0500  out-of-sample (second half)   n= 21456  blended_net_apr=  6.11%  always_2d_net_apr=  5.12%  lift=+0.99pp  mean_weight_on_30d= 11.2%
+thresh=0.0800  in-sample (first half)        n= 21455  blended_net_apr=  8.12%  always_2d_net_apr=  5.84%  lift=+2.28pp  mean_weight_on_30d= 15.3%
+thresh=0.0800  out-of-sample (second half)   n= 21456  blended_net_apr=  5.58%  always_2d_net_apr=  5.12%  lift=+0.46pp  mean_weight_on_30d=  4.0%
+
+====================================================================================================
+PART B: utilization vs. stale-order settings -- MOCK SIMULATION, disclosed fill-probability heuristic (MockBitfinexClient.FILL_PROB_PER_CYCLE), NOT real fill data. Directional only.
+====================================================================================================
+ wait_mult   drift_pp   active_(earning)   pending_(locked,idle)   cancelled_stale_total
+      0.50      0.005              48.2%                   10.5%                     598
+      0.50      0.010              61.9%                   14.5%                     615
+      0.50      0.020              67.0%                   15.6%                     613
+      0.50      0.040              73.3%                   17.1%                     611
+      1.00      0.005              38.6%                    7.7%                     486
+      1.00      0.010              38.7%                    7.6%                     423
+      1.00      0.020              72.3%                   19.2%                     682
+      1.00      0.040              80.6%                   16.9%                     567
+      1.50      0.005              62.1%                   11.5%                     496
+      1.50      0.010              81.8%                   18.5%                     578
+      1.50      0.020              63.2%                   12.5%                     377
+      1.50      0.040              80.7%                   19.6%                     399
+      2.00      0.005              62.1%                   11.5%                     496
+      2.00      0.010              81.8%                   18.5%                     577
+      2.00      0.020              71.2%                   15.1%                     414
+      2.00      0.040              81.5%                   18.8%                     391

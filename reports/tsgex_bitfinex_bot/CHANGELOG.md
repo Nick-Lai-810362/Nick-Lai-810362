@@ -1,5 +1,63 @@
 # Changelog
 
+## v5.4 (research: capital utilization vs. annualized return -- no code change, `term_premium_min_pp` default kept)
+
+The user asked how to get the highest annualized return WITHOUT sacrificing
+capital utilization. These pull in different directions and needed to be
+tested as two separate questions with different evidence quality, not
+answered from intuition -- see `research/param_sweep_utilization_vs_return.py`
+and `research/param_sweep_results_2026-09-14.txt`.
+
+**Part A (real data, rigorous): replayed `decide_tenor_allocation()` against
+all 42,911 real hourly fUSD p2/p30 observations (2021-08 to 2026-09, the
+same data as v5.1) under a grid of `term_premium_min_pp` values, assuming
+full instant fill.** Under that assumption, blended net APR is monotonically
+higher the LOWER the threshold goes (0.0 -> +1.98pp out-of-sample lift over
+always-2d, vs. the current default 0.02 -> +1.63pp, vs. 0.08 -> +0.46pp),
+because a lower threshold shifts more weight onto the 30d tenor whenever
+ANY positive premium is visible. **This result is a ceiling, not an
+achievable number**, because it shares the same full-fill assumption v5.0
+already flagged as unrealistic.
+
+**Part B (mock simulation, disclosed heuristic -- Bitfinex has no historical
+order-book/fill-latency endpoint, so there is no real data to backtest fill
+probability against): ran the bot's own `run_cycle()` against
+`MockBitfinexClient`'s fill-probability heuristic across a grid of
+`--max-wait-multiplier` / `--rate-drift-threshold-pp`, measuring the ACTIVE
+(actually earning) capital fraction, separately from PENDING (committed but
+not yet earning).** Single-seed, noisy (cell-to-cell swings of 40+
+percentage points on adjacent settings), so read directionally only: a
+`rate_drift_threshold_pp` that's too tight drove MORE cancel+relist churn,
+which resets a position back to `pending` (restarting its wait for a fresh
+fill) rather than helping it fill sooner -- in this mock, active fraction was
+consistently worse at the tightest drift setting (0.005) than looser ones
+across every wait-multiplier tested.
+
+**Why these don't combine into one number, and why the default wasn't
+changed:** Part A's "lower threshold always wins" result only holds because
+it assumes 30d fills exactly as reliably as 2d. v4's real trade-count data
+says otherwise -- 2d is 89.6% of matched trade volume, 30d is ~1% -- and
+`MockBitfinexClient`'s fill probabilities don't scale down further as more
+capital is pushed at a thin tenor (a disclosed simplification, see
+`mock_client.py`), so Part A's optimistic ceiling likely overstates what a
+lower threshold would actually achieve once a large real position tries to
+fill against that thin 30d book. The current default (0.02) already commits
+26-35% of capital to 30d in this backtest; pushing it lower chases a paper
+return this project has no real data to confirm is actually collectable.
+**No default changed** -- the honest position, per this project's own
+`decide_tenor_allocation()` docstring, is that the tenor-allocation
+threshold reads the CURRENT live premium, not a forecast, and this research
+didn't produce real fill-probability data to justify moving it either way.
+
+**Practical answer given to the user:** utilization is driven almost
+entirely by stale-order discipline (keep `--rate-drift-threshold-pp` loose
+enough to avoid relist churn -- 0.005 was the one setting that consistently
+hurt active fraction across the sweep) and by staying anchored to the
+liquid 2d tenor rather than chasing yield into the thin 30d market past
+what the current default already allocates; return is driven by
+`term_premium_min_pp`, but the sweep itself shows why going below the
+current default is a real-data-unverified bet, not a proven improvement.
+
 ## v5.3 (real, API-connected local web dashboard)
 
 The user pointed out the only dashboard that existed (the CSV-import

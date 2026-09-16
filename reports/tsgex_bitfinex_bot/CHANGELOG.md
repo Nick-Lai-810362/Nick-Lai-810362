@@ -1,5 +1,76 @@
 # Changelog
 
+## v5.7 (research: full ~5-year walk-forward backtest of the real `run_cycle()` -- no code change)
+
+The user asked for a complete backtest report of THIS PROGRAM (not a
+spreadsheet re-derivation of its math): fill latency from order placement to
+match, cancel+relist operations, and rate volatility, over the real ~5-year
+fUSD rate history already collected, using the bot's own designed polling
+behavior, walk-forward with no lookahead (as if the future rate path were
+unknown at every simulated moment -- which it genuinely is, since the walk-
+forward cursor in `HistoricalFundingBook` only ever exposes the current row).
+
+Built `research/backtest_full_5year.py`: a `MockBitfinexClient` subclass
+(`HistoricalFundingBook`) that keeps the mock's disclosed offer-lifecycle
+simulation (`FILL_PROB_PER_CYCLE`, submit/cancel, wallet) unchanged and only
+overrides `get_funding_book()` to return the REAL historical 2d/30d rate at
+the current cursor instead of a synthetic random walk, then drives the
+literal `runner.run_cycle()` once per real historical hour (the finest grain
+the 5-year dataset supports) across all four non-`custom` modes (`dave_high`,
+`dave_fast`, `barbell`, `frr` -- `custom` is redundant with `dave_high`
+since they differ only in the spike-reserve check, which defaults off).
+Window: 2021-08-23 to 2026-09-07 (bounded by p30's shorter real history),
+42,911 valid joint hourly observations, ~158,730 USD starting capital (the
+project's standing NT$5,000,000 worked example). Full output:
+`research/backtest_full_5year_results_2026-09-16.txt`.
+
+**Headline results** (CAGR = geometric annualized growth of terminal net
+worth vs. contributed principal; `realized_apr` = analytics.py's simple-
+interest annualization of total realized profit -- see its own documented
+caveat that this UNDERSTATES true compounding):
+
+| mode | CAGR | realized_apr | final net worth (from $158,730) | cancelled (stale) |
+|---|---|---|---|---|
+| dave_high | 28.80%/yr | 52.94% | $569,022 | 125,782 |
+| barbell | 13.86%/yr | 18.94% | $305,481 | 87,413 |
+| dave_fast | 6.31%/yr | 7.40% | $216,073 | 6,687 |
+| frr | 6.31%/yr | 7.40% | $216,073 | 6,687 |
+
+`dave_fast` and `frr` are numerically IDENTICAL in this backtest -- not a
+bug: `execution.place_frr_tranche()` already documents that it books FRR
+accrual against "the currently observed short-tenor rate" as a disclosed
+proxy (no real historical hourly FRR series exists to backtest against
+separately), and both modes place one single full-lendable-amount tranche
+at the short tenor per cycle, so they are mathematically the same trade
+sequence here. A live FRR order would actually settle against Bitfinex's own
+floating rate, which can differ from the best displayed rate -- this
+backtest cannot measure that gap.
+
+**Answers the user's specific spike-handling question with real numbers**:
+of every stale pending order this backtest cancelled and relisted, over
+99.9% (dave_high: 125,656/125,782; barbell: 100.0%; dave_fast/frr: 99.3%)
+were triggered by `rate_drift_threshold_pp` (the quoted rate moved away from
+the market), not by hitting `max_wait_hours` (patience timeout) -- confirming
+the mechanism described in v5.0/v5.6 is, in practice, almost always the
+rate-reactive path, not the patience path, over real 5-year rate volatility.
+Median time from order placement to fill: ~1.0h across every mode (p90
+2-4h) -- the disclosed `FILL_PROB_PER_CYCLE` heuristic (not measured; no
+historical order-book endpoint exists, same limitation disclosed since v5.0)
+applied at 1-hour-cycle granularity.
+
+**What is and isn't real data here** (same disclosure standard as every
+other backtest in this project): the 2d/30d RATES driving every decision are
+the real historical series. Per-tenor order-book DEPTH is a constant,
+disclosed heuristic (real historical depth-over-time cannot be measured --
+Bitfinex's API has no historical order-book endpoint), so a real illiquidity
+dry-spell at 30d that happened at some point in these 5 years cannot be
+detected or reacted to by this backtest. `FILL_PROB_PER_CYCLE` is the same
+already-disclosed heuristic from `MockBitfinexClient`, reused unmodified at
+a 1-hour cycle length -- not directly comparable to the 6-hour-cycle version
+used in v5.4's utilization sweep. No config default changed as a result of
+this backtest; it answers "what would have happened," not "what should the
+defaults be."
+
 ## v5.6 (fix: dead, misleading `StrategyConfig.poll_interval_sec` field removed)
 
 The user asked how a sudden mid-cycle rate spike on a still-pending order is

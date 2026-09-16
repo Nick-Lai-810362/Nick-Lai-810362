@@ -1,0 +1,98 @@
+====================================================================================================
+Full backtest window: 2021-08-23 10:00:00+00:00 to 2026-09-07 10:00:00+00:00  (42,911 valid joint hourly observations, 5.04 years)
+Capital: 158,730.00 USD (NT$5,000,000 worked-example scale)
+====================================================================================================
+
+Running mode=dave_high ...
+    [dave_high] 5,000/42,911 cycles  (   1.6s elapsed, 14,203 positions so far)
+    [dave_high] 10,000/42,911 cycles  (   9.0s elapsed, 36,371 positions so far)
+    [dave_high] 15,000/42,911 cycles  (  21.4s elapsed, 54,396 positions so far)
+    [dave_high] 20,000/42,911 cycles  (  38.6s elapsed, 75,743 positions so far)
+    [dave_high] 25,000/42,911 cycles  (  61.7s elapsed, 100,466 positions so far)
+    [dave_high] 30,000/42,911 cycles  (  91.1s elapsed, 130,176 positions so far)
+    [dave_high] 35,000/42,911 cycles  ( 131.0s elapsed, 171,039 positions so far)
+    [dave_high] 40,000/42,911 cycles  ( 181.7s elapsed, 213,920 positions so far)
+    [dave_high] done: 42,911 cycles in 222.5s, final position count = 251,901
+
+Running mode=dave_fast ...
+    [dave_fast] 5,000/42,911 cycles  (   0.2s elapsed, 1,105 positions so far)
+    [dave_fast] 10,000/42,911 cycles  (   0.9s elapsed, 3,583 positions so far)
+    [dave_fast] 15,000/42,911 cycles  (   2.4s elapsed, 8,131 positions so far)
+    [dave_fast] 20,000/42,911 cycles  (   5.3s elapsed, 12,422 positions so far)
+    [dave_fast] 25,000/42,911 cycles  (   9.4s elapsed, 15,532 positions so far)
+    [dave_fast] 30,000/42,911 cycles  (  13.8s elapsed, 16,527 positions so far)
+    [dave_fast] 35,000/42,911 cycles  (  19.0s elapsed, 20,211 positions so far)
+    [dave_fast] 40,000/42,911 cycles  (  25.0s elapsed, 22,722 positions so far)
+    [dave_fast] done: 42,911 cycles in 29.4s, final position count = 24,395
+
+Running mode=barbell ...
+    [barbell] 5,000/42,911 cycles  (   1.5s elapsed, 9,677 positions so far)
+    [barbell] 10,000/42,911 cycles  (   7.1s elapsed, 24,262 positions so far)
+    [barbell] 15,000/42,911 cycles  (  17.7s elapsed, 45,756 positions so far)
+    [barbell] 20,000/42,911 cycles  (  33.8s elapsed, 66,616 positions so far)
+    [barbell] 25,000/42,911 cycles  (  55.7s elapsed, 84,482 positions so far)
+    [barbell] 30,000/42,911 cycles  (  80.7s elapsed, 97,302 positions so far)
+    [barbell] 35,000/42,911 cycles  ( 111.1s elapsed, 116,982 positions so far)
+    [barbell] 40,000/42,911 cycles  ( 146.1s elapsed, 135,971 positions so far)
+    [barbell] done: 42,911 cycles in 172.4s, final position count = 148,284
+
+Running mode=frr ...
+    [frr] 5,000/42,911 cycles  (   0.2s elapsed, 1,105 positions so far)
+    [frr] 10,000/42,911 cycles  (   0.8s elapsed, 3,583 positions so far)
+    [frr] 15,000/42,911 cycles  (   2.3s elapsed, 8,131 positions so far)
+    [frr] 20,000/42,911 cycles  (   5.1s elapsed, 12,422 positions so far)
+    [frr] 25,000/42,911 cycles  (   9.5s elapsed, 15,532 positions so far)
+    [frr] 30,000/42,911 cycles  (  13.9s elapsed, 16,527 positions so far)
+    [frr] 35,000/42,911 cycles  (  19.3s elapsed, 20,211 positions so far)
+    [frr] 40,000/42,911 cycles  (  25.5s elapsed, 22,722 positions so far)
+    [frr] done: 42,911 cycles in 30.0s, final position count = 24,395
+
+====================================================================================================
+RESULTS SUMMARY
+====================================================================================================
+mode           CAGR  realized_apr  cur_net_apr  final_net_worth  realized_profit  positions   matured  cancelled  mean_fill_h  median_fill_h  p90_fill_h
+dave_high    28.80%        52.94%       20.97%       569,022.46       410,292.46    251,901   125,307    125,782         1.42           1.00        2.00
+dave_fast     6.31%         7.40%        7.22%       216,072.74        57,342.74     24,395    17,691      6,687         1.37           1.00        2.00
+barbell      13.86%        18.94%        7.71%       305,480.57       146,750.57    148,284    60,041     87,413         2.04           1.00        4.00
+frr           6.31%         7.40%        7.22%       216,072.74        57,342.74     24,395    17,691      6,687         1.37           1.00        2.00
+
+====================================================================================================
+CANCEL+RELIST REASON BREAKDOWN (why a stale pending order was pulled)
+====================================================================================================
+mode        cancelled_total  due_to_rate_drift  due_to_wait_timeout  pct_drift  pct_timeout
+dave_high           125,782            125,656                  126      99.9%         0.1%
+dave_fast             6,687              6,640                   47      99.3%         0.7%
+barbell              87,413             87,371                   42     100.0%         0.0%
+frr                   6,687              6,640                   47      99.3%         0.7%
+
+====================================================================================================
+PER-MODE DETAIL
+====================================================================================================
+
+--- dave_high ---
+  window: 1841.0 days (5.04 years), 42,911 hourly cycles, wall time 222.5s
+  overview: {'principal_contributed_total': 158730.0, 'idle_principal': 0.0, 'idle_profit': 0.0, 'idle_total': 0.0, 'committed_active': 564076.7973360743, 'committed_pending': 4945.667024167482, 'committed_total': 569022.4643602418, 'realized_profit_total': 410292.4643602357, 'net_worth_estimate': 569022.4643602418, 'position_count_total': 251901, 'position_count_open': 812}
+  apr: {'current_weighted_gross_apr': 0.2467148228762994, 'current_weighted_net_apr': 0.20970759944485448, 'current_active_capital': 564076.7973360743, 'realized_apr': 0.5293940701009038, 'realized_profit_total': 410292.4643602357, 'elapsed_days': 1782.1666666666667}
+  earnings.profit_by_tenor: {2: 205807.04070156172, 30: 204485.42365866632}
+  CAGR (terminal net worth vs contributed principal, geometric): 28.804%
+
+--- dave_fast ---
+  window: 1841.0 days (5.04 years), 42,911 hourly cycles, wall time 29.4s
+  overview: {'principal_contributed_total': 158730.0, 'idle_principal': 0.0, 'idle_profit': 3.036683395268856e-13, 'idle_total': 3.036683395268856e-13, 'committed_active': 216072.74357276846, 'committed_pending': 6.073366790537712e-13, 'committed_total': 216072.74357276846, 'realized_profit_total': 57342.74357270483, 'net_worth_estimate': 216072.74357276846, 'position_count_total': 24395, 'position_count_open': 17}
+  apr: {'current_weighted_gross_apr': 0.08489169999999964, 'current_weighted_net_apr': 0.0721579449999997, 'current_active_capital': 216072.74357276846, 'realized_apr': 0.07398846200610051, 'realized_profit_total': 57342.74357270483, 'elapsed_days': 1782.1666666666667}
+  earnings.profit_by_tenor: {2: 57342.74357270483}
+  CAGR (terminal net worth vs contributed principal, geometric): 6.305%
+
+--- barbell ---
+  window: 1841.0 days (5.04 years), 42,911 hourly cycles, wall time 172.4s
+  overview: {'principal_contributed_total': 158730.0, 'idle_principal': 0.0, 'idle_profit': 2.842170943040401e-14, 'idle_total': 2.842170943040401e-14, 'committed_active': 302527.62625984405, 'committed_pending': 2952.9436595794696, 'committed_total': 305480.56991942355, 'realized_profit_total': 146750.56991942174, 'net_worth_estimate': 305480.56991942355, 'position_count_total': 148284, 'position_count_open': 830}
+  apr: {'current_weighted_gross_apr': 0.09075922164118835, 'current_weighted_net_apr': 0.0771453383950101, 'current_active_capital': 302527.62625984405, 'realized_apr': 0.18935000822013462, 'realized_profit_total': 146750.56991942174, 'elapsed_days': 1782.1666666666667}
+  earnings.profit_by_tenor: {2: 7892.178557331216, 30: 138858.3913620894}
+  CAGR (terminal net worth vs contributed principal, geometric): 13.860%
+
+--- frr ---
+  window: 1841.0 days (5.04 years), 42,911 hourly cycles, wall time 30.0s
+  overview: {'principal_contributed_total': 158730.0, 'idle_principal': 0.0, 'idle_profit': 3.036683395268856e-13, 'idle_total': 3.036683395268856e-13, 'committed_active': 216072.74357276846, 'committed_pending': 6.073366790537712e-13, 'committed_total': 216072.74357276846, 'realized_profit_total': 57342.74357270483, 'net_worth_estimate': 216072.74357276846, 'position_count_total': 24395, 'position_count_open': 17}
+  apr: {'current_weighted_gross_apr': 0.08489169999999964, 'current_weighted_net_apr': 0.0721579449999997, 'current_active_capital': 216072.74357276846, 'realized_apr': 0.07398846200610051, 'realized_profit_total': 57342.74357270483, 'elapsed_days': 1782.1666666666667}
+  earnings.profit_by_tenor: {2: 57342.74357270483}
+  CAGR (terminal net worth vs contributed principal, geometric): 6.305%

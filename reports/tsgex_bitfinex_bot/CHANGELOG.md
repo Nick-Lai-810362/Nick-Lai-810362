@@ -1,5 +1,50 @@
 # Changelog
 
+## v5.8 (fix: real bug -- `best_rate_by_tenor()` mixed funding bids and asks)
+
+The user asked how to confirm the bot actually works against the real
+Bitfinex API before handing over live credentials. This session's own
+sandbox has zero network egress (confirmed: the proxy rejects
+`api.bitfinex.com:443` with an explicit "organization policy" denial), so
+the user ran the dry-run (`python tsgex_bitfinex_lending_bot.py --mode
+dave_high --cycles 5`, no `--live`, no `--mock`) on their own machine.
+
+**Bug #1 -- HTTP 403 on every request.** `client.py`'s `_get()`/`_signed_post()`
+sent no `User-Agent` header, so `urllib` defaulted to `Python-urllib/3.9`, a
+well-known bot signature that Bitfinex's edge/WAF layer rejects outright
+before the request reaches any API logic. Fixed by sending an honest,
+descriptive `User-Agent` (`tsgex-bfx-bot/5.7 (+github URL)`) on every
+request. This could not have been caught earlier -- this bot's dev sandbox
+has never had network egress to Bitfinex to notice it.
+
+**Bug #2 -- `best_rate_by_tenor()` mixed funding bids and asks (the real
+find).** After the 403 was fixed, every cycle reported a nonsensical
+~0.04% gross APR and correctly held (below `floor_rate`). The user's own
+sharp follow-up question -- "could 0.04 actually be an un-annualized daily
+rate?" -- turned out not to be the cause (the code does annualize before
+printing), but pushed the investigation to fetch and inspect a real
+`GET /v2/book/fUSD/P0` response directly. That response confirmed
+Bitfinex's funding book mixes BOTH sides in one array: `AMOUNT < 0` rows
+are funding BIDS (someone wants to BORROW), `AMOUNT > 0` rows are funding
+ASKS (someone wants to LEND -- the side a lending bot actually competes
+against). `strategy.best_rate_by_tenor()` took the global minimum rate per
+tenor across BOTH sides with no sign filtering, so it could pick up a deep,
+stale, irrelevant bid-side rate (real capture: a 2d bid down at
+0.00013992, i.e. that OTHER side's worst quote) instead of the real
+best ASK (real capture: 0.00022328, ~8.15%/yr -- consistent with this
+project's own 5-year historical median). `depth_by_tenor()` still sums both
+sides deliberately (a general "is this tenor actively traded at all"
+signal, not a fill-probability estimate for one side) -- left unchanged,
+flagged as an open question for later, not bundled into this fix.
+
+Neither bug was catchable by the existing test suite: `MockBitfinexClient`
+only ever generates positive-amount rows, so bid/ask mixing was invisible
+to every unit test and to the full 5-year backtest (v5.7, which also only
+used the mock's lifecycle simulation). This is exactly the failure mode the
+user's live dry-run was for. Added a regression test
+(`test_best_rate_by_tenor_ignores_bid_side_negative_amount_rows`) using a
+trimmed excerpt of the actual live capture as its fixture.
+
 ## v5.7 (research: full ~5-year walk-forward backtest of the real `run_cycle()` -- no code change)
 
 The user asked for a complete backtest report of THIS PROGRAM (not a

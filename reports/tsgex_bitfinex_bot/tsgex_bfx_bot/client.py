@@ -19,7 +19,7 @@ from .constants import BFX_API_URL
 # elsewhere in this file). A normal, honest client identifier is enough to
 # clear it; this changes nothing about what is requested or how the response
 # is parsed.
-USER_AGENT = "tsgex-bfx-bot/5.7 (+https://github.com/Nick-Lai-810362/Nick-Lai-810362)"
+USER_AGENT = "tsgex-bfx-bot/5.8 (+https://github.com/Nick-Lai-810362/Nick-Lai-810362)"
 
 
 class BitfinexClient:

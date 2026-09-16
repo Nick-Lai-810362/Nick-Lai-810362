@@ -8,4 +8,4 @@ over from the monolithic script's docstring history) for the actual design
 decisions and the real-data research behind them.
 """
 
-__version__ = "5.7.0"
+__version__ = "5.8.0"

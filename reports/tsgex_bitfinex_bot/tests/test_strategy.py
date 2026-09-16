@@ -37,6 +37,34 @@ def test_depth_by_tenor_sums_amount_per_period():
     assert out[5] == 60  # abs() applied -- book amounts can be signed (bid vs offer)
 
 
+def test_best_rate_by_tenor_ignores_bid_side_negative_amount_rows():
+    """Regression for a real bug found via a live GET /v2/book/fUSD/P0 call
+    (see CHANGELOG.md "v5.8"): a real book mixes funding BIDS (negative
+    amount, someone wants to borrow) and ASKS (positive amount, someone
+    wants to lend) in one array. Before this fix, best_rate_by_tenor() took
+    the global minimum rate per period across both sides, which could pick
+    a deep, stale bid-side rate far below the real lend-side (ask) rate --
+    observed live as a nonsensical ~0.04% "gross APR" instead of the
+    correct ~8%/yr. Fixture is a trimmed, real excerpt of that live
+    response (2d/30d rows only, exact rates from the capture)."""
+    book = [
+        # bid side (amount < 0) -- funding DEMANDED, i.e. borrow requests.
+        # Deliberately includes a rate LOWER than any real ask, exactly like
+        # the live capture that surfaced this bug.
+        [0.00022, 30, 1, -30100],
+        [0.00015, 2, 6, -25008502.3262702],
+        [0.00014, 2, 1, -237849.17107191],
+        [0.0001399197277084323, 2, 1, -2156.07538073],  # the deep, irrelevant bid that broke the old code
+        # ask side (amount > 0) -- funding OFFERED, i.e. other lenders.
+        [0.00022421418569753426, 30, 1, 394.52],
+        [0.0002232849322033898, 2, 2, 8548.5002621],
+        [0.00022465753424657532, 2, 3, 1400.48],
+    ]
+    out = best_rate_by_tenor(book)
+    assert out[2] == 0.0002232849322033898  # the best ASK, not the deeper bid
+    assert out[30] == 0.00022421418569753426
+
+
 def test_decide_tenor_allocation_stays_all_short_when_no_premium(cfg):
     tenor_rates = {2: 0.0002, 30: 0.0002}  # identical rate, no premium
     alloc = decide_tenor_allocation(tenor_rates, cfg)

@@ -19,14 +19,31 @@ from .constants import TENOR_TYPICAL_ORDER_SIZE
 
 def best_rate_by_tenor(book: list) -> Dict[int, float]:
     """Scans the full funding book and returns {tenor_days: best (lowest)
-    daily_rate actually quoted at that tenor right now} for EVERY period
+    ASK daily_rate actually quoted at that tenor right now} for EVERY period
     present -- not filtered to a fixed shortlist. Depth filtering (avoiding
     thin/illiquid periods) happens separately in decide_tenor_allocation via
     depth_by_tenor(), since "is this rate real" and "is this rate tradeable"
-    are different questions."""
+    are different questions.
+
+    ONLY considers AMOUNT > 0 rows (funding ASKS -- other participants
+    offering to LEND, the side we compete with as a lender) and skips
+    AMOUNT < 0 rows (funding BIDS -- participants wanting to BORROW).
+    Confirmed via a real live GET /v2/book/fUSD/P0 response (this bot's own
+    dev sandbox has no network egress to Bitfinex, so this could not be
+    checked until a user ran it from their own machine): a real book mixes
+    both sides in one array, sorted as two separate blocks (bids first,
+    descending; asks second, ascending). Before this fix, taking the global
+    minimum rate per period across BOTH sides could pick up a deep, stale
+    borrow-side bid instead of the actual best lend-side ask -- observed
+    live as a nonsensical ~0.04% "gross APR" (the true live 2d ask-side rate
+    at the same moment was consistent with the historical ~5-8%/yr range).
+    MockBitfinexClient only ever generates positive-amount rows, so this bug
+    was invisible to every existing unit test."""
     out: Dict[int, float] = {}
     for row in book:
-        rate, period = row[0], row[1]
+        rate, period, amount = row[0], row[1], row[3]
+        if amount <= 0:
+            continue
         if period not in out or rate < out[period]:
             out[period] = rate
     return out
@@ -35,7 +52,13 @@ def best_rate_by_tenor(book: list) -> Dict[int, float]:
 def depth_by_tenor(book: list) -> Dict[int, float]:
     """Total quoted USD amount at each period in the current book -- used to
     filter out periods with only a token quote or two (see v5.2:
-    cfg.min_period_depth_usd)."""
+    cfg.min_period_depth_usd). Deliberately sums BOTH bid and ask sides
+    (unlike best_rate_by_tenor) as a general "is this tenor actively traded
+    by real participants at all" signal, not a fill-probability estimate for
+    either side specifically -- open question for a future revision whether
+    this should also be side-filtered; not changed here since the live-data
+    finding that motivated this revision was specifically about the RATE
+    reference, not depth."""
     out: Dict[int, float] = {}
     for row in book:
         period, amount = row[1], abs(row[3])

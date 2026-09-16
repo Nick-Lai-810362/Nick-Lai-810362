@@ -1,5 +1,36 @@
 # Changelog
 
+## v5.6 (fix: dead, misleading `StrategyConfig.poll_interval_sec` field removed)
+
+The user asked how a sudden mid-cycle rate spike on a still-pending order is
+handled, and how often the bot actually polls for that. The cancel+relist
+answer was already correct and already covered this (see v5.0:
+`execution.reconcile_pending_offers()` compares a pending order's quoted
+rate against the CURRENT live rate every cycle and cancels+relists if the
+drift exceeds `--rate-drift-threshold-pp` in EITHER direction -- a sudden
+spike is exactly the "drifted away from my quoted rate" case, no special-
+casing needed). But answering "how often" surfaced a real bug: `cli.py`'s
+actual poll cadence is its own separate `--poll-interval` CLI flag
+(default 5 real seconds, used directly in `time.sleep()`), while
+`StrategyConfig.poll_interval_sec` (default 300) sat right next to it in
+the config dataclass, looking like it controlled the same thing, and was
+never read anywhere in the codebase -- confirmed via grep across the whole
+package and test suite. Anyone constructing a `StrategyConfig` directly
+(bypassing `cli.py`) and setting `poll_interval_sec` expecting it to change
+polling frequency would have silently gotten 5 seconds regardless. Removed
+the dead field rather than wiring it up post hoc, since `cli.py`'s
+`--poll-interval` argument is already the single real source of truth and
+duplicating it in the dataclass would just reintroduce the same trap.
+
+Also clarified for the user: polling is NOT millisecond-scale, by design --
+Bitfinex's own documented request-rate limit is 10-90 requests/minute
+depending on endpoint, and each cycle already makes multiple calls (book
+GET, active-offers check, any submit/cancel calls), so sub-second polling
+would risk the rate limit for no real benefit -- Bitfinex's own FRR updates
+only hourly, and nothing in the funding market moves on a millisecond
+timescale that this bot could usefully react to. `--poll-interval` (default
+5s) is user-configurable if a different cadence is wanted.
+
 ## v5.5 (retraction: "jump mode" high-turnover premise tested against real data and REJECTED)
 
 The user asked for a high-annualized-return design in the spirit of Fuly's

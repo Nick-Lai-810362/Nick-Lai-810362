@@ -85,7 +85,6 @@ class StrategyConfig:
 
     state_path: str = "bfx_bot_state.json"
     audit_log_path: Optional[str] = "bfx_bot_audit_log.jsonl"
-    poll_interval_sec: int = 300
 
 
 def platform_fee(cfg: StrategyConfig) -> float:

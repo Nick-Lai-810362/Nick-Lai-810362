@@ -138,8 +138,26 @@ def run_backtest(mode: str, timestamps, p2_arr: np.ndarray, p30_arr: np.ndarray,
     client = HistoricalFundingBook(p2_arr, p30_arr)
     rate_history = []
 
+    # Cheap, in-memory-only tally of WHY each stale order was cancelled (wait-
+    # timeout vs. rate-drift) -- the actual reason string execution.py already
+    # computes, just captured here instead of written to an audit-log file
+    # (audit_log_path=None avoids ~tens of thousands of disk appends per mode
+    # without losing the information; this changes only where the string
+    # goes, not any decision or ledger effect).
+    cancel_reason_counts = {"waited": 0, "rate drifted": 0}
+    real_write_audit_log = runner_mod.write_audit_log
+
+    def _tally_audit_log(cfg_arg, record):
+        if record.get("action") == "pending_reconcile":
+            for ev in record.get("events", []):
+                if ev.get("event") == "cancelled_stale":
+                    reason = ev.get("reason", "")
+                    key = "waited" if reason.startswith("waited") else "rate drifted"
+                    cancel_reason_counts[key] += 1
+
     real_save_state = runner_mod.save_state
     runner_mod.save_state = lambda *a, **kw: None
+    runner_mod.write_audit_log = _tally_audit_log
     t0 = time.time()
     n = len(timestamps)
     try:
@@ -152,6 +170,7 @@ def run_backtest(mode: str, timestamps, p2_arr: np.ndarray, p30_arr: np.ndarray,
                       file=sys.stderr)
     finally:
         runner_mod.save_state = real_save_state
+        runner_mod.write_audit_log = real_write_audit_log
 
     reconcile_matured_positions(state, timestamps[-1])
     save_state(state, cfg.state_path)
@@ -180,6 +199,7 @@ def run_backtest(mode: str, timestamps, p2_arr: np.ndarray, p30_arr: np.ndarray,
         "overview": ov, "earnings": ea, "apr": ap, "cagr": cagr,
         "position_count_total": len(state.positions), "matured_count": len(matured),
         "cancelled_stale_count": len(cancelled),
+        "cancel_reason_counts": dict(cancel_reason_counts),
         "mean_fill_wait_hours": float(np.mean(fill_wait_hours)) if fill_wait_hours else None,
         "median_fill_wait_hours": float(np.median(fill_wait_hours)) if fill_wait_hours else None,
         "p90_fill_wait_hours": float(np.percentile(fill_wait_hours, 90)) if fill_wait_hours else None,
@@ -257,6 +277,21 @@ def main():
               f"{(r['mean_fill_wait_hours'] or float('nan')):12.2f} "
               f"{(r['median_fill_wait_hours'] or float('nan')):14.2f} "
               f"{(r['p90_fill_wait_hours'] or float('nan')):11.2f}")
+
+    print()
+    print("=" * 100)
+    print("CANCEL+RELIST REASON BREAKDOWN (why a stale pending order was pulled)")
+    print("=" * 100)
+    print(f"{'mode':<10} {'cancelled_total':>16} {'due_to_rate_drift':>18} {'due_to_wait_timeout':>20} "
+          f"{'pct_drift':>10} {'pct_timeout':>12}")
+    for r in all_results:
+        c = r["cancel_reason_counts"]
+        drift_n, wait_n = c.get("rate drifted", 0), c.get("waited", 0)
+        total = drift_n + wait_n
+        pct_drift = drift_n / total * 100 if total else float("nan")
+        pct_wait = wait_n / total * 100 if total else float("nan")
+        print(f"{r['mode']:<10} {r['cancelled_stale_count']:16,} {drift_n:18,} {wait_n:20,} "
+              f"{pct_drift:9.1f}% {pct_wait:11.1f}%")
 
     print()
     print("=" * 100)

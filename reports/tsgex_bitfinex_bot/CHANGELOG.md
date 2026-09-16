@@ -1,5 +1,30 @@
 # Changelog
 
+## v5.10 (research: is v5.7's CAGR carried by the 2021 rate spike? -- no code change)
+
+Direct follow-up to v5.7: does dave_high's 28.80%/yr 5-year CAGR depend on
+the 2021 rate spike embedded in the backtest window (data starts
+2021-08-23, i.e. mid-crypto-bull-market)? Built
+`research/backtest_year_by_year.py`: reuses the exact same real
+`run_cycle()` walk-forward machinery as v5.7 (same `HistoricalFundingBook`,
+same real fUSD p2/p30 data, same cleaning), adding net-worth checkpoints at
+every UTC calendar-year boundary, plus a second full pass starting
+2022-01-01 (2021 fully dropped) for a clean "what if I'd started lending
+after the spike" number. Full output:
+`research/backtest_year_by_year_results_2026-09-16.txt`.
+
+**Finding: no, 2021 is not carrying the result.** Year-by-year CAGR: 2021
+(partial, Aug-Dec) 19.32%, 2022 31.51%, 2023 20.85%, 2024 30.26%, 2025
+35.41%, 2026 (partial, Jan-Sep) 30.50% -- 2021 is actually one of the
+WEAKER years, not the standout; 2025 was the best. Re-running the whole
+backtest starting 2022-01-01 (2021 excluded entirely) gives 27.19%/yr CAGR
+vs. the full window's 28.80%/yr -- a 1.6pp difference, not the outsized gap
+a spike-dependent result would show. The strategy's return comes from
+consistently capturing rate premium across ordinary years, not from one
+bull-market outlier. No config default changed; same disclosed-heuristic
+caveats as v5.7 apply (fill probability and depth are still unmeasured
+assumptions, only the RATE series is real historical data).
+
 ## v5.9 (fix: real bug -- authenticated requests used the wrong URL path)
 
 The user tried the zero-cost, zero-risk validation step suggested for

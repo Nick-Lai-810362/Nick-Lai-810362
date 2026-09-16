@@ -1,0 +1,5 @@
+====================================================================================================
+Real compounded terminal wealth: continuously re-lending at 2d vs. 30d, net-of-fee, real fUSD rates
+====================================================================================================
+2d (jump mode candidate)      n_periods=1043  span=5.71y  terminal_wealth_multiple=1.365x  geometric_annualized_net_return=  5.60%
+30d (park-and-wait)           n_periods=  62  span=5.01y  terminal_wealth_multiple=1.562x  geometric_annualized_net_return=  9.31%

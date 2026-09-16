@@ -1,5 +1,51 @@
 # Changelog
 
+## v5.5 (retraction: "jump mode" high-turnover premise tested against real data and REJECTED)
+
+The user asked for a high-annualized-return design in the spirit of Fuly's
+publicly documented "Jump Strategy" (跳跳樂), and I proposed one: skip the
+30d tenor's premium entirely and instead compound faster by always
+re-lending at the liquid 2d tenor, reasoning that "even a modest gross rate
+differential compounds faster at 2d." **That reasoning was wrong, and I
+tested it against real data before writing any code -- see
+`research/compounding_frequency_2d_vs_30d.py` and
+`research/compounding_frequency_results_2026-09-16.txt`.**
+
+Method: resampled the real 5-year hourly fUSD p2/p30 series at EACH
+tenor's own natural maturity period (every 2 days for p2, every 30 days for
+p30 -- i.e. exactly when a real position matures and must be re-lent), and
+compounded net-of-fee simple interest forward across the full span, a
+different and more realistic methodology than v5.4's Part A (which measured
+a snapshot blend under a full-instant-fill assumption, not compounded
+terminal wealth). Result: **continuously re-lending at 2d produced a
+geometric annualized net return of 5.60% over 5.7 years (1043 periods);
+parking at 30d produced 9.31% over 5.0 years (62 periods)** -- a ~3.7
+percentage-point gap that closely cross-validates v4's independently
+measured 5-year median (p30-p2) spread of +3.65pp using a completely
+different method (point-in-time snapshot vs. compounded terminal wealth).
+Two independent measurements agreeing this closely is strong evidence the
+30d term premium is real, not noise -- and it is large enough that no
+realistic compounding-frequency effect at single-digit APRs comes close to
+closing a 3.7pp/year gap (compounding frequency only matters at much higher
+rates or far more compounding periods than funding markets ever see).
+
+**Conclusion: the "jump mode" proposal is REJECTED. No new mode was added.**
+The already-existing `custom`/`dave_high` behavior --
+`decide_tenor_allocation()` shifting SOME capital to 30d only when a live
+premium clears `term_premium_min_pp`, capped by `max_total_shift_from_short`
+and gated by `min_period_depth_usd` -- remains the best-supported design in
+this codebase for pursuing return without pretending fill risk at the thin
+30d tenor doesn't exist (v4 finding #1: 30d is only ~1% of trade volume).
+This finding, if anything, reinforces v5.4's conclusion from the other
+direction: the 30d premium is real and worth partially capturing (so don't
+abandon it for a "just churn 2d faster" scheme that real data shows
+underperforms it), but it's real liquidity limits, not the premium's
+existence, that should govern how much of `max_total_shift_from_short` a
+given account size can realistically expect to get filled at -- something
+this project still has no real order-book depth data to quantify (see v5.2,
+v5.4). No default changed here either; this entry exists so the rejected
+idea and the evidence against it are on record, not silently dropped.
+
 ## v5.4 (research: capital utilization vs. annualized return -- no code change, `term_premium_min_pp` default kept)
 
 The user asked how to get the highest annualized return WITHOUT sacrificing

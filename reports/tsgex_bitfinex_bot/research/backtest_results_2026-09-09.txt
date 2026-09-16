@@ -1,0 +1,23 @@
+====================================================================================================
+TEST 1: spike_signal (fast6>slow24 MA crossover) vs forward APR change (percentage points)
+====================================================================================================
+[+24h] first half (in-sample)        n_on= 11648 n_off= 13346  mean_change|ON= -0.931pp  mean_change|OFF= +0.806pp  median|ON= -0.178pp  median|OFF= +0.097pp
+[+24h] second half (out-of-sample)   n_on= 11458 n_off= 13536  mean_change|ON= -0.742pp  mean_change|OFF= +0.627pp  median|ON= -0.266pp  median|OFF= +0.073pp
+[ +7d] first half (in-sample)        n_on= 11610 n_off= 13312  mean_change|ON= -0.980pp  mean_change|OFF= +0.839pp  median|ON= -0.268pp  median|OFF= +0.201pp
+[ +7d] second half (out-of-sample)   n_on= 11435 n_off= 13487  mean_change|ON= -0.906pp  mean_change|OFF= +0.743pp  median|ON= -0.418pp  median|OFF= +0.203pp
+
+====================================================================================================
+TEST 2: does the current term premium predict the FUTURE premium (persistence)?
+====================================================================================================
+[ +7d] in-sample        n= 20785  corr(now,future)=+0.143  when now>=2pp: future_mean= +6.96pp (n=14057)  when now<2pp: future_mean= +5.19pp (n=6728)
+[ +7d] out-of-sample    n= 20786  corr(now,future)=+0.038  when now>=2pp: future_mean= +3.80pp (n=11920)  when now<2pp: future_mean= +3.23pp (n=8866)
+[+14d] in-sample        n= 20690  corr(now,future)=+0.095  when now>=2pp: future_mean= +6.78pp (n=14027)  when now<2pp: future_mean= +5.62pp (n=6663)
+[+14d] out-of-sample    n= 20690  corr(now,future)=+0.027  when now>=2pp: future_mean= +3.69pp (n=11864)  when now<2pp: future_mean= +3.34pp (n=8826)
+[+30d] in-sample        n= 20512  corr(now,future)=+0.063  when now>=2pp: future_mean= +6.70pp (n=13875)  when now<2pp: future_mean= +5.89pp (n=6637)
+[+30d] out-of-sample    n= 20512  corr(now,future)=+0.018  when now>=2pp: future_mean= +3.53pp (n=11916)  when now<2pp: future_mean= +3.59pp (n=8596)
+
+====================================================================================================
+TEST 3: forecasting the future 2d rate level -- spike-signal-conditioned mean vs naive persistence
+====================================================================================================
+[+24h] naive-persistence MAE= 2.140pp   spike-conditioned MAE= 2.254pp   improvement= -5.3%
+[ +7d] naive-persistence MAE= 2.474pp   spike-conditioned MAE= 2.525pp   improvement= -2.1%

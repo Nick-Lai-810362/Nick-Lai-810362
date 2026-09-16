@@ -15,9 +15,14 @@ BFX_MIN_ORDER_USD = 150.0  # Bitfinex's own documented funding-offer minimum
 # Real, liquid tenor buckets per Bitfinex's own documentation ("the most
 # common periods are 2, 7, or 30 days") and real trade-volume evidence
 # (period=2 was 89.6% of trade count / 96%+ of volume in the ~10,000-row
-# recent trades sample; period=30 ~1.0%, period=120 just 0.11%).
+# recent trades sample; period=30 ~1.0%, period=120 just 0.11%). Kept here for
+# reference/documentation only -- as of v5.2, strategy.decide_tenor_allocation
+# no longer hard-filters to this shortlist; it reads whatever periods the
+# live book actually quotes (Bitfinex accepts any period from 2-120 days) and
+# gates each one on live rate premium + book depth instead. See
+# CHANGELOG.md "v5.2".
 TARGET_TENORS = (2, 7, 30)
-EXTREME_TENOR = 120  # excluded from TARGET_TENORS: measured no rate premium
+EXTREME_TENOR = 120  # >30d tenors need cfg.authorize_extreme_tenor: measured no rate premium
 # over 30d across 5 years of real p30/p120 candle data (median spread +0.04pp,
 # positive only 55.4% of the time) while having ~8x less liquidity than the
 # already-thin 30d market -- strictly dominated. Opt-in only via

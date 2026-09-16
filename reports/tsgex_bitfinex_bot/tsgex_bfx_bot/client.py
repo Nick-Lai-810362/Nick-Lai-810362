@@ -11,6 +11,16 @@ from typing import Optional
 
 from .constants import BFX_API_URL
 
+# Some of Bitfinex's edge/WAF layer rejects requests with no User-Agent (or
+# Python's default "Python-urllib/x.y", a well-known bot signature) with a
+# bare 403 before the request ever reaches the API logic itself -- found via
+# a real live call from a user's own machine (this bot's own sandbox has no
+# network egress to verify against; see the NOT-verified-live disclosures
+# elsewhere in this file). A normal, honest client identifier is enough to
+# clear it; this changes nothing about what is requested or how the response
+# is parsed.
+USER_AGENT = "tsgex-bfx-bot/5.9 (+https://github.com/Nick-Lai-810362/Nick-Lai-810362)"
+
 
 class BitfinexClient:
     def __init__(self, api_key: Optional[str] = None, api_secret: Optional[str] = None):
@@ -26,7 +36,7 @@ class BitfinexClient:
         return self._get(f"{BFX_API_URL}/v2/ticker/{symbol}")
 
     def _get(self, url: str):
-        req = urllib.request.Request(url, headers={"Accept": "application/json"})
+        req = urllib.request.Request(url, headers={"Accept": "application/json", "User-Agent": USER_AGENT})
         with urllib.request.urlopen(req, timeout=15) as resp:
             return json.loads(resp.read().decode())
 
@@ -35,12 +45,24 @@ class BitfinexClient:
         if not self.api_key or not self.api_secret:
             raise RuntimeError("API key/secret required for authenticated endpoints")
         nonce = str(int(time.time() * 1_000_000))
-        path = f"/api/v2/{endpoint}"
+        # Bitfinex's own quirk (docs.bitfinex.com/docs/rest-auth): the HMAC
+        # signature payload is computed over a path string PREFIXED with
+        # "/api/v2/", but the actual HTTP request path is just "/v2/..." --
+        # same as the public endpoints. Using "/api/v2/..." for BOTH (as
+        # this code did before) sends the request to a URL that doesn't
+        # exist, which is consistent with the live 302-then-404 a user hit
+        # running this against a real key for the first time (this bot's
+        # dev sandbox has no network egress to Bitfinex, so the auth path
+        # was never live-tested before now).
+        signature_path = f"/api/v2/{endpoint}"
+        request_path = f"/v2/{endpoint}"
         body_json = json.dumps(body)
-        sig = hmac.new(self.api_secret.encode(), f"{path}{nonce}{body_json}".encode(), hashlib.sha384).hexdigest()
-        headers = {"Content-Type": "application/json", "bfx-nonce": nonce,
+        sig = hmac.new(self.api_secret.encode(), f"{signature_path}{nonce}{body_json}".encode(),
+                        hashlib.sha384).hexdigest()
+        headers = {"Content-Type": "application/json", "bfx-nonce": nonce, "User-Agent": USER_AGENT,
                    "bfx-apikey": self.api_key, "bfx-signature": sig}
-        req = urllib.request.Request(f"{BFX_API_URL}{path}", data=body_json.encode(), headers=headers, method="POST")
+        req = urllib.request.Request(f"{BFX_API_URL}{request_path}", data=body_json.encode(), headers=headers,
+                                      method="POST")
         with urllib.request.urlopen(req, timeout=15) as resp:
             return json.loads(resp.read().decode())
 
@@ -50,6 +72,25 @@ class BitfinexClient:
 
     def get_active_funding_offers(self, symbol: str):
         return self._signed_post(f"auth/r/funding/offers/{symbol}", {})
+
+    def get_wallet_balances(self):
+        """[[WALLET_TYPE, CURRENCY, BALANCE, UNSETTLED_INTEREST, BALANCE_AVAILABLE, ...], ...]
+        per docs.bitfinex.com/reference/rest-auth-wallets. Only needs read scope on
+        "wallets" -- governance.assert_minimal_permissions already only blocks WRITE
+        scope on that permission, so this is safe under the funding-only key policy.
+        NOT verified against a live call (network egress to Bitfinex is blocked in the
+        sandbox this bot was developed in) -- cross-check the parsed values against the
+        Bitfinex UI before relying on them, same caveat as extract_offer_id()."""
+        return self._signed_post("auth/r/wallets", {})
+
+    def get_funding_loans_history(self, symbol: str, limit: int = 200):
+        """Exchange-side record of past funding loans (offers that were taken and have
+        since closed) for `symbol`, per docs.bitfinex.com/reference/rest-auth-funding-loans-hist.
+        Used as an optional live cross-check against this bot's own local ledger, which
+        remains the authoritative record for principal/profit accounting -- this bot may
+        not be the only thing lending on the account. NOT verified against a live call,
+        same caveat as get_wallet_balances()."""
+        return self._signed_post(f"auth/r/funding/loans/{symbol}/hist", {"limit": limit})
 
     def submit_funding_offer(self, symbol: str, amount: float, daily_rate: float, period_days: int):
         """

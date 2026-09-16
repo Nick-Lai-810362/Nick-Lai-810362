@@ -1,4 +1,41 @@
-from tsgex_bfx_bot.client import extract_offer_id
+import hashlib
+import hmac
+import json
+from unittest.mock import MagicMock, patch
+
+from tsgex_bfx_bot.client import BitfinexClient, extract_offer_id
+
+
+def test_signed_post_request_url_has_no_doubled_api_prefix():
+    """Regression for a real bug found via a live call with a real API key
+    (see CHANGELOG.md "v5.9"): the HTTP request path must be "/v2/<endpoint>"
+    (matching the public endpoints), NOT "/api/v2/<endpoint>" -- the
+    "/api/v2/" prefix belongs only in the HMAC signature payload string,
+    per Bitfinex's own documented (if easy to misread) convention. Using it
+    for the request URL too sent every authenticated call to a URL that
+    doesn't exist (a live 404)."""
+    client = BitfinexClient(api_key="k", api_secret="s")
+    captured = {}
+
+    def fake_urlopen(req, timeout=15):
+        captured["url"] = req.full_url
+        captured["signature"] = req.headers["Bfx-signature"]
+        captured["nonce"] = req.headers["Bfx-nonce"]
+        resp = MagicMock()
+        resp.__enter__.return_value = resp
+        resp.__exit__.return_value = False
+        resp.read.return_value = b"{}"
+        return resp
+
+    with patch("urllib.request.urlopen", side_effect=fake_urlopen):
+        client._signed_post("auth/r/permissions", {})
+
+    assert captured["url"] == "https://api.bitfinex.com/v2/auth/r/permissions"
+
+    expected_sig = hmac.new(
+        b"s", f"/api/v2/auth/r/permissions{captured['nonce']}{json.dumps({})}".encode(), hashlib.sha384
+    ).hexdigest()
+    assert captured["signature"] == expected_sig
 
 
 def test_extract_offer_id_mock_shape():

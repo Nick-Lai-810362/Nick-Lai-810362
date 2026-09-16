@@ -1,0 +1,484 @@
+<title>放貸機器人使用手冊</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,440;9..144,600;9..144,680&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --bg: #f4f5f1;
+    --surface: #ffffff;
+    --surface-2: #ebede7;
+    --ink: #14201c;
+    --ink-2: #4a564e;
+    --ink-3: #818d84;
+    --border: rgba(18,32,27,0.12);
+    --border-strong: rgba(18,32,27,0.22);
+    --accent: #1f6f57;
+    --accent-ink: #0f4536;
+    --accent-soft: rgba(31,111,87,0.10);
+    --good: #1f6f57;
+    --good-soft: rgba(31,111,87,0.09);
+    --bad: #a1403d;
+    --bad-soft: rgba(161,64,61,0.09);
+    --warn: #a8721f;
+    --warn-soft: rgba(168,114,31,0.10);
+    --code-bg: #eef1ec;
+    --shadow: 0 1px 2px rgba(18,32,27,0.05), 0 8px 24px -12px rgba(18,32,27,0.14);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0d1512; --surface: #151f1a; --surface-2: #1c2721;
+      --ink: #eef2ee; --ink-2: #b7c2ba; --ink-3: #7c8880;
+      --border: rgba(238,242,238,0.12); --border-strong: rgba(238,242,238,0.22);
+      --accent: #4fd8a8; --accent-ink: #bff2dd; --accent-soft: rgba(79,216,168,0.13);
+      --good: #4fd8a8; --good-soft: rgba(79,216,168,0.12);
+      --bad: #e2827e; --bad-soft: rgba(226,130,126,0.12);
+      --warn: #e0a94c; --warn-soft: rgba(224,169,76,0.12);
+      --code-bg: #1a2420;
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 10px 28px -10px rgba(0,0,0,0.5);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0d1512; --surface: #151f1a; --surface-2: #1c2721;
+    --ink: #eef2ee; --ink-2: #b7c2ba; --ink-3: #7c8880;
+    --border: rgba(238,242,238,0.12); --border-strong: rgba(238,242,238,0.22);
+    --accent: #4fd8a8; --accent-ink: #bff2dd; --accent-soft: rgba(79,216,168,0.13);
+    --good: #4fd8a8; --good-soft: rgba(79,216,168,0.12);
+    --bad: #e2827e; --bad-soft: rgba(226,130,126,0.12);
+    --warn: #e0a94c; --warn-soft: rgba(224,169,76,0.12);
+    --code-bg: #1a2420;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 10px 28px -10px rgba(0,0,0,0.5);
+  }
+
+  * { box-sizing: border-box; }
+  .doc-root {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", -apple-system, "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+    font-size: 15px;
+    line-height: 1.7;
+  }
+  .num, code, pre, kbd { font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace; }
+  h1, h2, h3 { font-family: "Fraunces", Georgia, "Noto Serif TC", serif; text-wrap: balance; }
+
+  header.masthead {
+    border-bottom: 1.5px solid var(--border-strong);
+    padding: 28px 24px 22px;
+    background: var(--surface);
+  }
+  header.masthead .inner { max-width: 1180px; margin: 0 auto; }
+  header.masthead h1 { font-size: 26px; font-weight: 680; margin: 0 0 6px; letter-spacing: -0.01em; }
+  header.masthead p { margin: 0; color: var(--ink-2); font-size: 13.5px; }
+  header.masthead .meta { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+  .tag {
+    font-family: "IBM Plex Mono", monospace; font-size: 11px; padding: 3px 9px; border-radius: 999px;
+    background: var(--accent-soft); color: var(--accent-ink); font-weight: 600;
+  }
+
+  .layout { max-width: 1180px; margin: 0 auto; padding: 26px 24px 80px; display: grid; grid-template-columns: 240px 1fr; gap: 36px; align-items: start; }
+  @media (max-width: 860px) { .layout { grid-template-columns: 1fr; padding: 20px 16px 60px; } }
+
+  nav.toc-desktop { position: sticky; top: 20px; align-self: start; }
+  @media (max-width: 860px) { nav.toc-desktop { display: none; } }
+  nav.toc-desktop .toc-label { font-family: "IBM Plex Mono", monospace; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-3); margin-bottom: 10px; }
+  nav.toc-desktop ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+  nav.toc-desktop a {
+    display: block; padding: 6px 10px; border-radius: 7px; color: var(--ink-2); text-decoration: none; font-size: 13px;
+    border-left: 2px solid transparent;
+  }
+  nav.toc-desktop a:hover { background: var(--surface-2); color: var(--ink); }
+
+  details.toc-mobile { display: none; }
+  @media (max-width: 860px) {
+    details.toc-mobile { display: block; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 4px 14px; margin-bottom: 20px; }
+    details.toc-mobile summary { cursor: pointer; padding: 10px 0; font-weight: 600; font-size: 13.5px; }
+    details.toc-mobile ol { list-style: none; margin: 0 0 12px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+    details.toc-mobile a { color: var(--accent-ink); text-decoration: none; font-size: 13.5px; }
+  }
+
+  main { min-width: 0; }
+  main section { margin-bottom: 42px; scroll-margin-top: 16px; }
+  main h2 { font-size: 21px; font-weight: 680; margin: 0 0 14px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+  main h3 { font-size: 15.5px; font-weight: 600; margin: 22px 0 8px; font-family: "IBM Plex Sans", sans-serif; color: var(--ink); }
+  main p { margin: 0 0 12px; max-width: 68ch; }
+  main ul, main ol { margin: 0 0 14px; padding-left: 22px; }
+  main li { margin-bottom: 5px; }
+  main strong { font-weight: 600; }
+  code { background: var(--code-bg); padding: 1px 6px; border-radius: 4px; font-size: 0.88em; }
+  pre {
+    background: var(--code-bg); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px;
+    overflow-x: auto; font-size: 12.8px; line-height: 1.6; margin: 0 0 16px;
+  }
+  pre code { background: none; padding: 0; }
+
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; margin: 0 0 18px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 480px; }
+  thead th {
+    text-align: left; font-weight: 600; color: var(--ink-2); font-size: 11.5px; text-transform: uppercase;
+    letter-spacing: 0.03em; padding: 9px 12px; border-bottom: 1px solid var(--border); background: var(--surface-2);
+    white-space: nowrap;
+  }
+  tbody td { padding: 8px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody td:first-child { font-family: "IBM Plex Mono", monospace; font-size: 12.3px; white-space: nowrap; color: var(--accent-ink); }
+
+  .callouts { list-style: none; margin: 0 0 16px; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+  .callouts li { padding: 10px 14px; border-radius: 8px; border-left: 3px solid; font-size: 13.5px; }
+  .callouts li.good { background: var(--good-soft); border-color: var(--good); }
+  .callouts li.bad { background: var(--bad-soft); border-color: var(--bad); }
+  .callouts li.warn { background: var(--warn-soft); border-color: var(--warn); }
+  .callouts li b { display: inline-block; margin-right: 4px; }
+
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px,1fr)); gap: 12px; margin-bottom: 18px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; box-shadow: var(--shadow); }
+  .card h3 { margin: 0 0 6px; font-size: 14px; }
+  .card p { margin: 0; font-size: 12.8px; color: var(--ink-2); }
+  .card .path { font-family: "IBM Plex Mono", monospace; font-size: 11.5px; color: var(--accent-ink); margin-bottom: 6px; display: block; }
+
+  .architecture { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px; font-family: "IBM Plex Mono", monospace; font-size: 12px; line-height: 1.75; overflow-x: auto; white-space: pre; }
+
+  footer.doc-footer { max-width: 1180px; margin: 0 auto; padding: 0 24px 60px; color: var(--ink-3); font-size: 12.5px; }
+  @media (max-width: 860px) { footer.doc-footer { padding: 0 16px 40px; } }
+  footer.doc-footer a { color: var(--accent-ink); }
+</style>
+
+<div class="doc-root">
+  <header class="masthead">
+    <div class="inner">
+      <h1>TSGEX Bitfinex USD 保證金放貸自動化機器人</h1>
+      <p>完整使用說明書 — 適用對象：TSGEX 資產管理部與其他實際操作 / 維護此工具的人員</p>
+      <div class="meta">
+        <span class="tag">v5.6.0</span>
+        <span class="tag">105/105 測試通過</span>
+        <span class="tag">CLI + 本地儀表板 + 離線儀表板</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="layout">
+    <nav class="toc-desktop" aria-label="目錄">
+      <div class="toc-label">目錄</div>
+      <ol>
+        <li><a href="#s1">1. 這個工具是什麼</a></li>
+        <li><a href="#s2">2. 三個組成部分</a></li>
+        <li><a href="#s3">3. 安裝與需求</a></li>
+        <li><a href="#s4">4. 快速開始</a></li>
+        <li><a href="#s5">5. 核心概念</a></li>
+        <li><a href="#s6">6. 五種放貸模式</a></li>
+        <li><a href="#s7">7. CLI 參數對照表</a></li>
+        <li><a href="#s8">8. 安全機制</a></li>
+        <li><a href="#s9">9. 本地端網頁儀表板</a></li>
+        <li><a href="#s10">10. 離線 Artifact 儀表板</a></li>
+        <li><a href="#s11">11. 匯出歷史紀錄 CSV</a></li>
+        <li><a href="#s12">12. 實際上線部署流程</a></li>
+        <li><a href="#s13">13. 模組架構</a></li>
+        <li><a href="#s14">14. 研究結論摘要</a></li>
+        <li><a href="#s15">15. 疑難排解</a></li>
+      </ol>
+    </nav>
+
+    <main>
+      <details class="toc-mobile">
+        <summary>目錄</summary>
+        <ol>
+          <li><a href="#s1">1. 這個工具是什麼</a></li>
+          <li><a href="#s2">2. 三個組成部分</a></li>
+          <li><a href="#s3">3. 安裝與需求</a></li>
+          <li><a href="#s4">4. 快速開始</a></li>
+          <li><a href="#s5">5. 核心概念</a></li>
+          <li><a href="#s6">6. 五種放貸模式</a></li>
+          <li><a href="#s7">7. CLI 參數對照表</a></li>
+          <li><a href="#s8">8. 安全機制</a></li>
+          <li><a href="#s9">9. 本地端網頁儀表板</a></li>
+          <li><a href="#s10">10. 離線 Artifact 儀表板</a></li>
+          <li><a href="#s11">11. 匯出歷史紀錄 CSV</a></li>
+          <li><a href="#s12">12. 實際上線部署流程</a></li>
+          <li><a href="#s13">13. 模組架構</a></li>
+          <li><a href="#s14">14. 研究結論摘要</a></li>
+          <li><a href="#s15">15. 疑難排解</a></li>
+        </ol>
+      </details>
+
+      <section id="s1">
+        <h2>1. 這個工具是什麼</h2>
+        <p>一個獨立開發的 Bitfinex <code>fUSD</code>（USD 保證金放貸）自動化出借機器人，行為設計參考 Fuly.ai <strong>公開文件揭露</strong>的策略手法（IBRR/FBRR 概念、階梯式掛單、多天期配置），但所有實際數字與門檻都是用<strong>真實 Bitfinex 資料</strong>（5 年逐小時利率歷史、近萬筆真實成交紀錄）重新推導、回測、驗證過的，不是照抄假設。凡是無法用真實資料驗證的地方（例如掛單簿深度、真實成交延遲），文件與程式碼註解都會明講「這是揭露的推測，不是量測值」。</p>
+        <p><strong>這不是一個「保證獲利」的黑盒子。</strong>它是一個把「該掛多少錢、掛在哪個天期、多久該撤單重掛」這幾件事自動化、且全程可稽核（JSON-lines 稽核日誌）的工具。是否要接上真實金流、投入多少資金，仍然是人的決策。</p>
+      </section>
+
+      <section id="s2">
+        <h2>2. 三個組成部分</h2>
+        <div class="table-scroll">
+          <table>
+            <thead><tr><th>部分</th><th>檔案</th><th>用途</th><th>需要網路/API金鑰？</th></tr></thead>
+            <tbody>
+              <tr><td>放貸機器人本體</td><td>tsgex_bitfinex_lending_bot.py</td><td>實際讀取利率、決定配置、下單、記帳的核心程式</td><td>--mock 不需要；--live 需要</td></tr>
+              <tr><td>本地端儀表板</td><td>tsgex_bitfinex_dashboard.py</td><td>資產總覽／掛單詳情／出借歷史／收益年化，可即時對接 API，支援多子帳號</td><td>--mock 不需要；接真實帳戶需要</td></tr>
+              <tr><td>離線 Artifact 儀表板</td><td>reports/TSGEX_Bitfinex_Bot_Dashboard.html</td><td>上傳帳本檔案離線瀏覽同樣四個分頁，不需要跑任何本地程式</td><td>完全不需要</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>三者共用同一套帳本格式（<code>bfx_bot_state.json</code>）與同一套分析邏輯（機器人本體用 Python 的 <code>analytics.py</code>，離線 Artifact 用對應的 JavaScript 版本），數字算法是一致的。</p>
+      </section>
+
+      <section id="s3">
+        <h2>3. 安裝與需求</h2>
+        <pre><code># Python 3.8+，無需安裝任何第三方套件即可執行機器人本體、儀表板伺服器
+cd tsgex_bitfinex_bot
+python tsgex_bitfinex_lending_bot.py --help
+
+# 若要跑 research/ 底下的回測腳本，需要：
+pip install pandas numpy
+
+# 若要跑測試（開發/維護用）：
+pip install pytest
+pytest</code></pre>
+        <p>不需要 Docker、不需要資料庫、不需要任何雲端服務。狀態全部存在本機的 JSON 檔案裡。</p>
+      </section>
+
+      <section id="s4">
+        <h2>4. 快速開始</h2>
+        <pre><code># 1. 完全不需要 API 金鑰或網路，用模擬資料看整個流程如何運作
+python tsgex_bitfinex_lending_bot.py --mock --contribute 158730 --mode dave_high \
+    --cycles 10 --mock-days-per-cycle 3
+
+# 2. 同時打開儀表板看剛剛跑出來的帳本（另開一個終端機視窗）
+python tsgex_bitfinex_dashboard.py --mock
+# 瀏覽器打開 http://127.0.0.1:8765/
+
+# 3. 只想看即時市場利率、不下真實單（dry-run，需要網路，不需要金鑰）
+python tsgex_bitfinex_lending_bot.py --contribute 158730 --mode barbell
+
+# 4. 匯出完整部位歷史成 CSV
+python tsgex_bitfinex_lending_bot.py --export-csv history.csv
+
+# 5. 真正上線下真實單（詳見第 12 節，務必先完成前置設定）
+python tsgex_bitfinex_lending_bot.py --live --mode dave_high</code></pre>
+      </section>
+
+      <section id="s5">
+        <h2>5. 核心概念</h2>
+        <h3>5.1 天期（Tenor）與利率單位</h3>
+        <p>Bitfinex 放貸天期可以是 2～120 天中的任意整數天，但真實成交量高度集中：<strong>2 天期佔約 89.6% 成交筆數、96% 以上成交量</strong>；30 天期約 1%；120 天期僅 0.11%（來自近萬筆真實成交紀錄的統計）。</p>
+        <p>送到 Bitfinex API 的 <code>rate</code> 欄位是<strong>日利率</strong>（不是年化、也不是每小時利率——這點在研究階段特別重新查證過三個獨立來源確認）。程式內部一律先換算成年化（<code>daily_rate × 365</code>）再做決策與顯示。</p>
+        <p><strong>毛年化 vs 淨年化</strong>：Bitfinex 對放貸「利息收入」（不是本金）抽成——標準掛單 15%、隱藏掛單 18%。所有決策都是用淨年化（扣完手續費後）在判斷，不是用掛牌的毛利率。</p>
+        <h3>5.2 本金／利潤帳本</h3>
+        <p>機器人會分開追蹤「本來投入的本金」跟「已實現的利潤」，利潤拿去複投時仍然標記成利潤（不會因為滾入下一輪而被誤記成本金），這樣才能隨時回答「我到底賺了多少、本金還剩多少」。</p>
+        <h3>5.3 部位生命週期</h3>
+        <div class="architecture">pending（已送出掛單，本金已從閒置資金扣除，但尚未開始計息）
+   ├─→ active（已成交，天期與利息從「成交當下」開始算，不是從送出掛單那一刻）
+   │      └─→ matured（到期，本金歸還閒置資金池，利息計入已實現利潤）
+   └─→ cancelled（撤單重掛：等太久沒成交，或市場利率偏離太多，撤單後立刻用新利率重新送出）</div>
+        <p>這個生命週期是刻意設計的：真實 Bitfinex 掛單不是送出去就馬上生息，必須先等有人來借才會成交。</p>
+        <h3>5.4 動態天期配置</h3>
+        <p><code>custom</code> / <code>dave_high</code> 模式不是固定「30% 放 2 天、70% 放 30 天」這種寫死的表格，而是<strong>每個週期重新讀取當下真實利率</strong>，只有在「當下」觀察到的長天期溢價超過門檻（<code>--term-premium-min-pp</code>）時才會把部分資金移過去，並且有上限（<code>--max-total-shift-from-short</code>，預設 0.7：最短天期永遠留住至少 30%）與深度過濾（<code>--min-period-depth-usd</code>：掛牌簿太薄不管利率多誘人都不押）。</p>
+      </section>
+
+      <section id="s6">
+        <h2>6. 五種放貸模式</h2>
+        <div class="table-scroll">
+          <table>
+            <thead><tr><th>--mode</th><th>中文名稱</th><th>行為</th></tr></thead>
+            <tbody>
+              <tr><td>dave_high（預設）</td><td>戴夫高利模式</td><td>全自動多天期配置，外加一個動量訊號保留機制——<strong>預設關閉</strong>，因為用 5 年真實資料回測後發現訊號方向剛好是反的。</td></tr>
+              <tr><td>dave_fast</td><td>戴夫極速模式</td><td>只掛一張單、掛在當下最容易成交的最短天期、用最有競爭力的利率，犧牲利率換取幾乎立即成交。</td></tr>
+              <tr><td>custom</td><td>自訂</td><td>跟 dave_high 幾乎一樣的多天期配置邏輯，但不含動量保留機制，是最單純、最可預期的自動模式。</td></tr>
+              <tr><td>frr</td><td>FRR 浮動模式</td><td>掛單釘住 Bitfinex 自己的 Flash Return Rate（每小時浮動更新），不用自己猜利率。</td></tr>
+              <tr><td>barbell</td><td>槓鈴模式</td><td>資金一半放最短天期（流動性）、一半放較長天期（追求溢價），比例可調。</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p><strong>倒金字塔階梯掛單</strong>（除 dave_fast 外所有模式共用）：把資金拆成好幾張、金額與利率都遞增的掛單，而不是全部資金賭在一個利率猜測上。拆法兩種（<code>--tranche-sizing-mode</code>）：<code>calibrated</code>（預設，張數由真實成交量校準的典型單量反推）或 <code>fixed_count</code>（直接指定同時掛幾張，平均分配資金）。</p>
+      </section>
+
+      <section id="s7">
+        <h2>7. CLI 參數對照表</h2>
+        <p>執行 <code>python tsgex_bitfinex_lending_bot.py --help</code> 可看到即時版本。</p>
+        <h3>基本設定</h3>
+        <div class="table-scroll"><table>
+          <thead><tr><th>參數</th><th>預設</th><th>說明</th></tr></thead>
+          <tbody>
+            <tr><td>--symbol</td><td>fUSD</td><td>放貸幣別</td></tr>
+            <tr><td>--mode</td><td>dave_high</td><td>見第 6 節</td></tr>
+            <tr><td>--floor-rate</td><td>0.05</td><td>淨年化低於此門檻就不放貸</td></tr>
+            <tr><td>--reserved-amount</td><td>0.0</td><td>永遠保留不出借的金額</td></tr>
+            <tr><td>--contribute</td><td>0.0</td><td>本次執行前，先把這筆金額計入累計投入本金</td></tr>
+          </tbody>
+        </table></div>
+        <h3>天期配置</h3>
+        <div class="table-scroll"><table>
+          <thead><tr><th>參數</th><th>預設</th><th>說明</th></tr></thead>
+          <tbody>
+            <tr><td>--term-premium-min-pp</td><td>0.02</td><td>長天期溢價要超過幾個百分點才分配資金過去</td></tr>
+            <tr><td>--max-total-shift-from-short</td><td>0.7</td><td>最多可把短天期配置的幾成移到長天期</td></tr>
+            <tr><td>--min-period-depth-usd</td><td>1000.0</td><td>該天期掛牌簿深度低於此值就不考慮</td></tr>
+            <tr><td>--authorize-extreme-tenor</td><td>關閉</td><td>允許考慮 30 天以上天期（實測沒有比 30 天多賺）</td></tr>
+            <tr><td>--barbell-short-fraction</td><td>0.5</td><td>barbell 模式短天期佔比</td></tr>
+          </tbody>
+        </table></div>
+        <h3>掛單張數與大小</h3>
+        <div class="table-scroll"><table>
+          <thead><tr><th>參數</th><th>預設</th><th>說明</th></tr></thead>
+          <tbody>
+            <tr><td>--tranche-sizing-mode</td><td>calibrated</td><td>calibrated（依成交量校準）或 fixed_count（固定張數平分）</td></tr>
+            <tr><td>--max-concurrent-orders</td><td>20</td><td>僅 fixed_count 使用：同時掛幾張</td></tr>
+            <tr><td>--max-orders-per-cycle</td><td>400</td><td>僅 calibrated 使用：張數上限（保護機制，非 Bitfinex 限制）</td></tr>
+          </tbody>
+        </table></div>
+        <h3>撤單重掛</h3>
+        <div class="table-scroll"><table>
+          <thead><tr><th>參數</th><th>預設</th><th>說明</th></tr></thead>
+          <tbody>
+            <tr><td>--max-wait-multiplier</td><td>1.0</td><td>縮放各天期「等待多久算太久」門檻（2d:6h／7d:24h／30d:72h／120d:120h）</td></tr>
+            <tr><td>--rate-drift-threshold-pp</td><td>0.01</td><td>掛單利率跟市場偏離超過此值（不論漲跌）就撤單重掛。<strong>不建議低於 0.01</strong>，實測太緊反而拉低資金真正在生息的比例</td></tr>
+          </tbody>
+        </table></div>
+        <h3>進階/風險</h3>
+        <div class="table-scroll"><table>
+          <thead><tr><th>參數</th><th>預設</th><th>說明</th></tr></thead>
+          <tbody>
+            <tr><td>--enable-spike-reserve</td><td>關閉</td><td>dave_high 動量保留訊號，<strong>已證實方向是反的，不建議開啟</strong></td></tr>
+            <tr><td>--order-visibility</td><td>standard</td><td>standard（15% 手續費）或 hidden（18%）</td></tr>
+          </tbody>
+        </table></div>
+        <h3>執行控制 / 狀態 / 匯出</h3>
+        <div class="table-scroll"><table>
+          <thead><tr><th>參數</th><th>預設</th><th>說明</th></tr></thead>
+          <tbody>
+            <tr><td>--live</td><td>關閉</td><td>真的下真實單（需要 BFX_API_KEY/BFX_API_SECRET）</td></tr>
+            <tr><td>--mock</td><td>關閉</td><td>使用模擬市場資料</td></tr>
+            <tr><td>--cycles</td><td>1</td><td>執行幾個週期</td></tr>
+            <tr><td>--poll-interval</td><td>5（秒）</td><td>週期間的真實等待秒數</td></tr>
+            <tr><td>--mock-days-per-cycle</td><td>0</td><td>模擬模式下每週期讓時鐘快轉幾天</td></tr>
+            <tr><td>--state-file</td><td>bfx_bot_state.json</td><td>帳本檔案位置</td></tr>
+            <tr><td>--audit-log</td><td>bfx_bot_audit_log.jsonl</td><td>每週期決策紀錄</td></tr>
+            <tr><td>--export-csv / --export-tenor / --export-start / --export-end</td><td>無</td><td>匯出部位歷史，見第 11 節</td></tr>
+          </tbody>
+        </table></div>
+      </section>
+
+      <section id="s8">
+        <h2>8. 安全機制</h2>
+        <ul>
+          <li><strong>預設是 dry-run</strong>：不加 --live 就不會真的下單。</li>
+          <li><strong>--live 強制要求環境變數</strong>：金鑰絕不能用命令列參數傳，只能用 <code>BFX_API_KEY</code>/<code>BFX_API_SECRET</code> 環境變數。</li>
+          <li><strong>最小權限強制檢查</strong>：--live 啟動時會先確認金鑰沒有提領/轉帳權限，有的話直接拒絕執行。</li>
+          <li><strong>資金位置提醒</strong>：資金必須放在 Bitfinex 的 Funding 錢包，不是 Exchange 錢包。</li>
+          <li><strong>關閉 Bitfinex 內建 Lending Pro</strong>：沒關會跟這個機器人搶餘額互相打架下單。</li>
+          <li><strong>本地儀表板預設只綁 127.0.0.1</strong>：要對外開放必須明確加 <code>--allow-remote</code> 並自行承擔風險。</li>
+        </ul>
+      </section>
+
+      <section id="s9">
+        <h2>9. 本地端網頁儀表板</h2>
+        <pre><code># 零金鑰、零網路先試用
+python tsgex_bitfinex_dashboard.py --mock
+# 打開 http://127.0.0.1:8765/
+
+# 接單一真實帳戶（跟機器人本體共用同一組環境變數）
+export BFX_API_KEY=...
+export BFX_API_SECRET=...
+python tsgex_bitfinex_dashboard.py</code></pre>
+        <p>四個分頁：<strong>資產總覽</strong>、<strong>掛單詳情</strong>（含即時對帳）、<strong>出借歷史紀錄</strong>（可篩選、下載 CSV）、<strong>收益與年化報酬</strong>（圖表 + 兩種年化算法）。</p>
+        <h3>多子帳號切換</h3>
+        <pre><code>{
+  "profiles": [
+    {"name": "主帳戶", "state_path": "bfx_bot_state_main.json",
+     "api_key_env": "BFX_API_KEY_MAIN", "api_secret_env": "BFX_API_SECRET_MAIN"},
+    {"name": "子帳戶A", "state_path": "bfx_bot_state_a.json",
+     "api_key_env": "BFX_API_KEY_A", "api_secret_env": "BFX_API_SECRET_A",
+     "order_visibility": "hidden"}
+  ]
+}</code></pre>
+        <pre><code>export BFX_API_KEY_MAIN=... BFX_API_SECRET_MAIN=...
+export BFX_API_KEY_A=...    BFX_API_SECRET_A=...
+python tsgex_bitfinex_dashboard.py --profiles-file profiles.json</code></pre>
+        <p><strong>金鑰本身永遠不寫進 profiles.json</strong>，檔案裡只有環境變數的名字。切換帳戶在網頁右上角下拉選單直接選，不用重啟伺服器。</p>
+        <h3>為什麼這是本地伺服器，不是網頁連結</h3>
+        <p>claude.ai 的 Artifact 頁面的瀏覽器安全政策完全擋掉對 <code>api.bitfinex.com</code> 的請求，這是平台層級的硬限制。真正要接上即時 Bitfinex API，一定要有伺服器端去發送簽章過的請求，這就是為什麼這個功能必須做成本地程式。</p>
+      </section>
+
+      <section id="s10">
+        <h2>10. 離線 Artifact 儀表板</h2>
+        <p><code>reports/TSGEX_Bitfinex_Bot_Dashboard.html</code> 是給不想安裝/執行任何本地程式的人用的輕量選項：打開就會看到一組清楚標示「範例資料」的示範帳本，上傳您自己的 <code>bfx_bot_state.json</code>（建議）或舊版匯出 CSV，畫面會換成真實資料。同樣四個分頁、同樣的分析邏輯，但<strong>沒有</strong>即時 API 連線、也沒有多帳號切換。</p>
+      </section>
+
+      <section id="s11">
+        <h2>11. 匯出歷史紀錄 CSV</h2>
+        <pre><code>python tsgex_bitfinex_lending_bot.py --export-csv history.csv
+python tsgex_bitfinex_lending_bot.py --export-csv q1_30d.csv --export-tenor 30 \
+    --export-start 2026-01-01 --export-end 2026-03-31</code></pre>
+        <p>欄位：<code>id, status, label, tenor_days, amount, principal_component, profit_component, daily_rate, gross_apr, net_apr, placed_ts, filled_ts, maturity_ts, matured_ts, interest_earned</code>。可以直接丟進離線 Artifact 儀表板，或拉進 Excel 進一步分析。</p>
+      </section>
+
+      <section id="s12">
+        <h2>12. 實際上線部署流程</h2>
+        <ol>
+          <li>Bitfinex 後台 → API Keys → 建立新金鑰，<strong>只勾選 Margin Funding 讀寫</strong>，絕對不要勾 Withdraw。</li>
+          <li>把要出借的資金從 Exchange 錢包轉到 <strong>Funding 錢包</strong>。</li>
+          <li>如果 Lending Pro 自動放貸是開的，<strong>先關掉</strong>。</li>
+          <li>（建議）幫這把金鑰加上 IP 白名單限制。</li>
+          <li>匯出環境變數：<code>export BFX_API_KEY=... BFX_API_SECRET=...</code></li>
+          <li>先跑一次 dry-run 確認邏輯合理：<code>python tsgex_bitfinex_lending_bot.py --contribute 158730 --mode dave_high --cycles 1</code></li>
+          <li>檢查印出來的 <code>[DRY-RUN] would place:</code> 內容合理後，才加上 <code>--live</code>。</li>
+          <li>長時間運作用 <code>--cycles</code> 設大數字或包一層 cron/systemd，搭配本地儀表板即時監看。</li>
+        </ol>
+      </section>
+
+      <section id="s13">
+        <h2>13. 模組架構</h2>
+        <div class="architecture">tsgex_bitfinex_lending_bot.py   機器人本體進入點
+tsgex_bitfinex_dashboard.py     本地儀表板進入點
+
+tsgex_bfx_bot/
+  constants.py     真實資料推導的數字：典型單量、撤單門檻、平台手續費
+  config.py        StrategyConfig 設定物件 + platform_fee()/net_apr()
+  ledger.py        Position/BotState：本金／利潤帳本
+  client.py        BitfinexClient（真實 REST API）+ extract_offer_id()
+  mock_client.py   MockBitfinexClient：模擬掛牌簿與成交機率
+  governance.py    最小權限強制檢查
+  audit.py         JSON-lines 決策稽核紀錄
+  strategy.py      天期配置與階梯掛單邏輯
+  execution.py     下單、成交偵測、撤單重掛
+  runner.py        run_cycle()：串成一個完整週期
+  cli.py           argparse + main()
+  analytics.py     儀表板背後的純函式
+  profiles.py      多子帳號設定
+  webapp.py        本地端 HTTP 伺服器
+
+tests/             105 個測試，每個模組一份 + 端對端測試
+research/          回測與參數掃描腳本，附完整真實資料</div>
+      </section>
+
+      <section id="s14">
+        <h2>14. 研究結論摘要</h2>
+        <p>每一個門檻都經過真實資料檢驗，完整推導過程見 <code>CHANGELOG.md</code>：</p>
+        <ul class="callouts">
+          <li class="good"><b>✓ 已證實</b>2 天期是流動性核心：真實成交量 89.6% 集中在此，所有模式以此為錨點。</li>
+          <li class="good"><b>✓ 已證實</b>120 天期沒有額外報酬：中位數僅比 30 天期高 0.04pp，流動性卻差 8 倍，預設排除。</li>
+          <li class="good"><b>✓ 已證實</b>30 天期溢價真實存在且相當大：兩種獨立方法都測出約 +3.65～3.7pp/年的差距。</li>
+          <li class="bad"><b>✗ 已推翻</b>「動量訊號預測利率會漲」：實測發現訊號出現後利率反而平均下跌，預設關閉。</li>
+          <li class="bad"><b>✗ 已推翻</b>「用 2 天期高頻複利取代 30 天期溢價」：真實複利回測 2 天期年化僅 5.60%，30 天期是 9.31%。</li>
+          <li class="warn"><b>⚠ 需注意</b>撤單重掛門檻不要設太緊：0.005 時資金真正在生息的比例明顯變差。</li>
+          <li class="warn"><b>⚠ 需注意</b>降低長天期門檻追逐帳面高報酬是未驗證的賭注：理論上限越低報酬越高，但假設每個天期都能立即成交，30 天期實際只有約 1% 成交量。</li>
+          <li class="warn"><b>⚠ 揭露限制</b>Bitfinex 沒有歷史掛單簿/成交延遲 API：撤單等待、深度門檻都是合理推測，不是量測值，建議上線後持續用儀表板觀察實際頻率。</li>
+        </ul>
+      </section>
+
+      <section id="s15">
+        <h2>15. 疑難排解</h2>
+        <div class="table-scroll"><table>
+          <thead><tr><th>現象</th><th>處理方式</th></tr></thead>
+          <tbody>
+            <tr><td>--live requires BFX_API_KEY...</td><td>忘記 export 環境變數，或打錯變數名稱</td></tr>
+            <tr><td>REFUSING TO RUN: withdrawal/transfer permission</td><td>金鑰勾選了提領權限，建立一把只有 Margin Funding 權限的新金鑰</td></tr>
+            <tr><td>REFUSING TO BIND to 0.0.0.0</td><td>儀表板預設只給本機用，確定要對外開放才加 --allow-remote</td></tr>
+            <tr><td>儀表板顯示「即時對帳目前無法使用」</td><td>該帳戶沒設 API 金鑰環境變數，或網路連不到 Bitfinex——本地帳本仍正常顯示</td></tr>
+            <tr><td>掛單一直被撤單重掛、遲遲不成交</td><td>檢查 --rate-drift-threshold-pp 是否設太緊，或該天期流動性本來就薄</td></tr>
+            <tr><td>想確認邏輯但不想連真實網路</td><td>一律先用 --mock</td></tr>
+          </tbody>
+        </table></div>
+      </section>
+    </main>
+  </div>
+
+  <footer class="doc-footer">
+    如需更完整的研究方法與每個數字的推導過程，請見套件內的 <code>README.md</code>（模組地圖）與 <code>CHANGELOG.md</code>（完整版本歷史與每一次真實資料驗證的詳細記錄）。
+  </footer>
+</div>

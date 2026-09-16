@@ -39,9 +39,14 @@ two) -- all three were structurally impossible to catch in this bot's own
 dev sandbox (no network egress) or in the existing mock-based test suite
 (MockBitfinexClient never exercises the real HTTP layer at all), and all
 three were on the exact code paths this project's own disclosures already
-flagged as "NOT verified against a live call." Not yet re-confirmed against
-a live key (the user's original key must be rotated first) -- next step is
-to re-run `--live --contribute 0 --cycles 1` with a freshly generated key.
+flagged as "NOT verified against a live call." **Confirmed fixed against a live call with a freshly rotated key**:
+`--live --contribute 0 --cycles 1` returned `Permission check passed: key
+has no withdrawal/transfer scope` -- the real signed `auth/r/permissions`
+call succeeded, and the no-withdrawal governance gate correctly read the
+key's actual scopes. With this, every part of the connectivity/auth chain
+this session set out to validate (public book -> real rates -> decision
+logic -> authenticated permission check) has now been exercised against
+live Bitfinex data at least once, with zero capital at risk throughout.
 
 ## v5.8 (fix: real bug -- `best_rate_by_tenor()` mixed funding bids and asks)
 

@@ -11,6 +11,16 @@ from typing import Optional
 
 from .constants import BFX_API_URL
 
+# Some of Bitfinex's edge/WAF layer rejects requests with no User-Agent (or
+# Python's default "Python-urllib/x.y", a well-known bot signature) with a
+# bare 403 before the request ever reaches the API logic itself -- found via
+# a real live call from a user's own machine (this bot's own sandbox has no
+# network egress to verify against; see the NOT-verified-live disclosures
+# elsewhere in this file). A normal, honest client identifier is enough to
+# clear it; this changes nothing about what is requested or how the response
+# is parsed.
+USER_AGENT = "tsgex-bfx-bot/5.7 (+https://github.com/Nick-Lai-810362/Nick-Lai-810362)"
+
 
 class BitfinexClient:
     def __init__(self, api_key: Optional[str] = None, api_secret: Optional[str] = None):
@@ -26,7 +36,7 @@ class BitfinexClient:
         return self._get(f"{BFX_API_URL}/v2/ticker/{symbol}")
 
     def _get(self, url: str):
-        req = urllib.request.Request(url, headers={"Accept": "application/json"})
+        req = urllib.request.Request(url, headers={"Accept": "application/json", "User-Agent": USER_AGENT})
         with urllib.request.urlopen(req, timeout=15) as resp:
             return json.loads(resp.read().decode())
 
@@ -38,7 +48,7 @@ class BitfinexClient:
         path = f"/api/v2/{endpoint}"
         body_json = json.dumps(body)
         sig = hmac.new(self.api_secret.encode(), f"{path}{nonce}{body_json}".encode(), hashlib.sha384).hexdigest()
-        headers = {"Content-Type": "application/json", "bfx-nonce": nonce,
+        headers = {"Content-Type": "application/json", "bfx-nonce": nonce, "User-Agent": USER_AGENT,
                    "bfx-apikey": self.api_key, "bfx-signature": sig}
         req = urllib.request.Request(f"{BFX_API_URL}{path}", data=body_json.encode(), headers=headers, method="POST")
         with urllib.request.urlopen(req, timeout=15) as resp:

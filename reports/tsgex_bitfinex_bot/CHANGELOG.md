@@ -45,6 +45,15 @@ user's live dry-run was for. Added a regression test
 (`test_best_rate_by_tenor_ignores_bid_side_negative_amount_rows`) using a
 trimmed excerpt of the actual live capture as its fixture.
 
+**Confirmed fixed against a second live run** (same user, same machine,
+`--mode dave_high --contribute 10000 --cycles 5`, still no `--live`/`--mock`):
+the live 2d rate now reads as a sane 8.61%-20.61% gross ladder (13
+calibrated tranches summing to the full $10,000 contributed, in line with
+this project's own 5-year historical median), the tranche ladder and
+ledger bookkeeping behaved exactly as designed, and no exceptions occurred
+across 5 real-data cycles. This is the first time any part of this bot's
+live-book code path has run against a real Bitfinex response end to end.
+
 ## v5.7 (research: full ~5-year walk-forward backtest of the real `run_cycle()` -- no code change)
 
 The user asked for a complete backtest report of THIS PROGRAM (not a

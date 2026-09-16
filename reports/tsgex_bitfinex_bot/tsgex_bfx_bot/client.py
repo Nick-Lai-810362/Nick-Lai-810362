@@ -19,7 +19,7 @@ from .constants import BFX_API_URL
 # elsewhere in this file). A normal, honest client identifier is enough to
 # clear it; this changes nothing about what is requested or how the response
 # is parsed.
-USER_AGENT = "tsgex-bfx-bot/5.8 (+https://github.com/Nick-Lai-810362/Nick-Lai-810362)"
+USER_AGENT = "tsgex-bfx-bot/5.9 (+https://github.com/Nick-Lai-810362/Nick-Lai-810362)"
 
 
 class BitfinexClient:
@@ -45,12 +45,24 @@ class BitfinexClient:
         if not self.api_key or not self.api_secret:
             raise RuntimeError("API key/secret required for authenticated endpoints")
         nonce = str(int(time.time() * 1_000_000))
-        path = f"/api/v2/{endpoint}"
+        # Bitfinex's own quirk (docs.bitfinex.com/docs/rest-auth): the HMAC
+        # signature payload is computed over a path string PREFIXED with
+        # "/api/v2/", but the actual HTTP request path is just "/v2/..." --
+        # same as the public endpoints. Using "/api/v2/..." for BOTH (as
+        # this code did before) sends the request to a URL that doesn't
+        # exist, which is consistent with the live 302-then-404 a user hit
+        # running this against a real key for the first time (this bot's
+        # dev sandbox has no network egress to Bitfinex, so the auth path
+        # was never live-tested before now).
+        signature_path = f"/api/v2/{endpoint}"
+        request_path = f"/v2/{endpoint}"
         body_json = json.dumps(body)
-        sig = hmac.new(self.api_secret.encode(), f"{path}{nonce}{body_json}".encode(), hashlib.sha384).hexdigest()
+        sig = hmac.new(self.api_secret.encode(), f"{signature_path}{nonce}{body_json}".encode(),
+                        hashlib.sha384).hexdigest()
         headers = {"Content-Type": "application/json", "bfx-nonce": nonce, "User-Agent": USER_AGENT,
                    "bfx-apikey": self.api_key, "bfx-signature": sig}
-        req = urllib.request.Request(f"{BFX_API_URL}{path}", data=body_json.encode(), headers=headers, method="POST")
+        req = urllib.request.Request(f"{BFX_API_URL}{request_path}", data=body_json.encode(), headers=headers,
+                                      method="POST")
         with urllib.request.urlopen(req, timeout=15) as resp:
             return json.loads(resp.read().decode())
 

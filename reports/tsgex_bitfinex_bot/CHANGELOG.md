@@ -1,5 +1,48 @@
 # Changelog
 
+## v5.9 (fix: real bug -- authenticated requests used the wrong URL path)
+
+The user tried the zero-cost, zero-risk validation step suggested for
+someone without spare capital to test with: `--live --contribute 0
+--cycles 1` against a real API key, to exercise `governance.
+assert_minimal_permissions()` (a real signed call to `auth/r/permissions`)
+without any funds at risk. It failed with a live HTTP 404 (after an
+intermediate 302).
+
+**IMPORTANT, unrelated to the bug**: the user pasted their real API key and
+secret directly into the chat to report the error. Those must be treated as
+compromised regardless of anything else -- revoked/regenerated on Bitfinex
+immediately, never reused. This is a process note for whoever reads this
+CHANGELOG next, not a code issue.
+
+**The actual bug**: `client.py`'s `_signed_post()` used the same path
+string, `f"/api/v2/{endpoint}"`, for both the HMAC signature payload AND
+the real HTTP request URL. Per Bitfinex's own documented (and easy to
+misread) convention, the `/api/v2/` prefix belongs ONLY in the signature
+payload string -- the actual request path is `/v2/{endpoint}`, same as the
+public endpoints. Sending the request itself to `.../api/v2/auth/r/...`
+hit a URL that doesn't exist, which is exactly what a live 404 after a 302
+looks like. Every authenticated call (`get_permissions`,
+`get_active_funding_offers`, `submit_funding_offer`, `cancel_funding_offer`,
+`get_wallet_balances`, `get_funding_loans_history`) shared this same
+broken path construction, so this bug affected the entire authenticated
+surface, not just the permissions check. Fixed by separating
+`signature_path` ("/api/v2/...", used only for the HMAC payload) from
+`request_path` ("/v2/...", used for the actual request URL). Added
+`test_signed_post_request_url_has_no_doubled_api_prefix`, which mocks
+`urllib.request.urlopen` to assert the real request URL and signature both
+independently.
+
+This is the third real bug this session's live testing has surfaced
+(v5.8's bid/ask mixing and the earlier missing User-Agent were the first
+two) -- all three were structurally impossible to catch in this bot's own
+dev sandbox (no network egress) or in the existing mock-based test suite
+(MockBitfinexClient never exercises the real HTTP layer at all), and all
+three were on the exact code paths this project's own disclosures already
+flagged as "NOT verified against a live call." Not yet re-confirmed against
+a live key (the user's original key must be rotated first) -- next step is
+to re-run `--live --contribute 0 --cycles 1` with a freshly generated key.
+
 ## v5.8 (fix: real bug -- `best_rate_by_tenor()` mixed funding bids and asks)
 
 The user asked how to confirm the bot actually works against the real
